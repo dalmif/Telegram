@@ -123,6 +123,8 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager.widget.PagerAdapter;
 import androidx.viewpager.widget.ViewPager;
 
+import com.google.android.exoplayer2.util.Log;
+
 import org.telegram.PhoneFormat.PhoneFormat;
 import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.AndroidUtilities;
@@ -7344,9 +7346,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             }
 
             avatarX = 0;
-            avatarY = (actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0)
+            avatarY = (((actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0)
                     + ActionBar.getCurrentActionBarHeight() / 2.0f
-                    + 16 * AndroidUtilities.density
+                    + 16 * AndroidUtilities.density) * diff)
+                    + ((((avatarContainer.getHeight() * avatarContainer.getScaleY()) - avatarContainer.getHeight()) / 2) * (1 - diff))
+
 //                    + 27 * AndroidUtilities.density * diff
 //                    + actionBar.getTranslationY()
             ;
@@ -7506,6 +7510,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             }
 
             if (openAnimationInProgress && playProfileAnimation == 2) {
+                // The toolbar is expanding more than the expand mode (pulling down)
                 float avX = 0;
                 float avY = (actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0) + ActionBar.getCurrentActionBarHeight() / 2.0f - 21 * AndroidUtilities.density + actionBar.getTranslationY();
 
@@ -7567,8 +7572,13 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 avatarContainer.requestLayout();
 
                 updateCollectibleHint();
-            } else if (extraHeight <= AndroidUtilities.dp(200f)) {
-                avatarScale = (83 + 18 * diff) / 83.0f;
+            }
+
+            else if (extraHeight <= AndroidUtilities.dp(200f)) {
+                // The toolbar is collapsing here
+
+                // diff is the expand fraction (full expand = 1, full collapse = 0)
+                avatarScale = (83 - 83 * (1 - diff)) / 83.0f;
                 if (storyView != null) {
                     storyView.invalidate();
                 }
