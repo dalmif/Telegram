@@ -175,17 +175,17 @@ public class StarGiftPatterns {
         final float radius = dp(68);
 
         for (int level = 0; level < 2; level++) {
-            float localRadius;
-            float t;
-            if (level == 0) {
-                t = fraction == 0f ? 0f : (float) Math.pow(2, 4 * (fraction - 1));
-
-            } else {
-                t = fraction == 0f ? 0f : (float) Math.pow(2, 3 * (fraction - 1));
-            }
-            localRadius = lerp(0, radius + (level * dp(40)), t);
-            final float thisAlpha = (0.23f - (0.23f * 0.5f * level)) * t;
             for (int i = 0; i < 8; i++) {
+                float localRadius;
+                float t;
+                if (level == 0) {
+                    t = fraction == 0f ? 0f : (float) Math.pow(2, (i + 2)  * (fraction - 1));
+
+                } else {
+                    t = fraction == 0f ? 0f : (float) Math.pow(2, (i + 2) * (fraction - 1));
+                }
+                localRadius = lerp(0, radius + (level * dp(40)), t);
+                final float thisAlpha = (0.23f - (0.23f * 0.5f * level));
                 double angleDegrees = (i * 45) + (level * 15);
                 double angleRadians = Math.toRadians(angleDegrees);
 
