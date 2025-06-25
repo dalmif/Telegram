@@ -3,11 +3,12 @@ package org.telegram.ui.Stars;
 import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.messenger.AndroidUtilities.lerp;
 import static org.telegram.ui.Stars.StarsController.findAttribute;
-
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.Paint;
+import android.graphics.PointF;
 import android.graphics.RadialGradient;
 import android.graphics.RectF;
 import android.graphics.Shader;
@@ -15,7 +16,7 @@ import android.view.MotionEvent;
 import android.view.View;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
+import com.google.android.exoplayer2.util.Log;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.MessagesController;
@@ -42,6 +43,9 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
     private final View avatarContainer;
     private final ProfileActivity.AvatarImageView avatarImage;
     private final Theme.ResourcesProvider resourcesProvider;
+    private float group1Fraction;
+    private float group2Fraction;
+    private float group3Fraction;
 
     public ProfileGiftsView(Context context, int currentAccount, long dialogId, @NonNull View avatarContainer, ProfileActivity.AvatarImageView avatarImage, Theme.ResourcesProvider resourcesProvider) {
         super(context);
@@ -53,7 +57,6 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         this.avatarImage = avatarImage;
 
         this.resourcesProvider = resourcesProvider;
-
     }
 
     private float expandProgress;
@@ -62,6 +65,13 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             this.expandProgress = progress;
             invalidate();
         }
+    }
+
+    public void setCollapseProgress(float progress) {
+
+            group1Fraction = Math.min(1, progress * 4);
+            group2Fraction = Math.min(1, progress * 2);
+            group3Fraction = Math.min(1, progress * 1.6f);
     }
 
     private float actionBarProgress;
@@ -94,6 +104,8 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
     }
 
     public void setExpandCoords(float right, boolean rightPadded, float y) {
+        Log.i("mmd","here is setExpandCoords: " + right +" y:" + y);
+
         this.expandRight = right;
         this.expandRightPad = rightPadded;
         this.expandY = y;
@@ -282,7 +294,7 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             if (oldGift != null) {
                 g.copy(oldGift);
             } else {
-                g.gradient = new RadialGradient(0, 0, dp(22.5f), new int[] { g.color, Theme.multAlpha(g.color, 0.0f) }, new float[] { 0, 1 }, Shader.TileMode.CLAMP);
+                g.gradient = new RadialGradient(0, 0, dp(15.5f), new int[] { g.color, Theme.multAlpha(g.color, 0.0f) }, new float[] { 0, 1 }, Shader.TileMode.CLAMP);
                 g.gradientPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
                 g.gradientPaint.setShader(g.gradient);
                 if (g.document != null) {
@@ -328,15 +340,13 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         final float ay = avatarContainer.getY();
         final float aw = (avatarContainer.getWidth()) * avatarContainer.getScaleX();
         final float ah = (avatarContainer.getHeight()) * avatarContainer.getScaleY();
-
+        final float aww = avatarContainer.getWidth() - aw;
+        final float ahh = avatarContainer.getHeight() - ah;
         canvas.save();
         canvas.clipRect(0, 0, getWidth(), expandY);
 
-        final float acx = ax + aw / 2.0f;
-        final float cacx = Math.min(acx, dp(48));
-        final float acy = ay + ah / 2.0f;
-        final float ar = Math.min(aw, ah) / 2.0f + dp(6);
-        final float cx = getWidth() / 2.0f;
+        final float acx = ax + avatarContainer.getWidth() / 2.0f;
+        final float acy = ay + avatarContainer.getHeight() / 2.0f;
 
         final float closedAlpha = Utilities.clamp01((float) (expandY - (AndroidUtilities.statusBarHeight + ActionBar.getCurrentActionBarHeight())) / dp(50));
 
@@ -346,10 +356,14 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
             final float scale = lerp(0.5f, 1.0f, alpha);
             final int index = i; // gifts.size() == maxCount ? i - 1 : i;
             if (index == 0) {
+                PointF point = calculateEmojiCoordinate(acx,acy,-dp(64),-dp(52),group1Fraction);
+                // top-left
                 gift.draw(
                         canvas,
-                        lerp(cacx + Math.min(getWidth() * .27f, dp(70)), cx, 0.5f * actionBarProgress), acy - dp(52),
-                        scale, -4.0f,
+                        point.x,
+                        point.y,
+                        Math.max(0.5f,scale * (1 - group1Fraction)),
+                        -4.0f,
                         alpha * alpha * (1.0f - expandProgress) * (1.0f - actionBarProgress) * (closedAlpha),
                         1.0f
                 );
@@ -361,19 +375,27 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
 //                    alpha * (1.0f - expandProgress), lerp(0.9f, 0.25f, actionBarProgress)
 //                );
             } else if (index == 1) {
+                // bottom-right
+                PointF point = calculateEmojiCoordinate(acx,acy,dp(70),dp(26),group1Fraction);
                 gift.draw(
                         canvas,
-                        lerp(cacx +  dp(195), cx, 0.5f * actionBarProgress), acy + dp(18),
-                        scale, -4.0f,
+                        point.x,
+                        point.y,
+                        Math.max(0.5f,scale* (1 - group1Fraction)),
+                        -4.0f,
                         alpha * alpha * (1.0f - expandProgress) * (1.0f - actionBarProgress) * (closedAlpha),
                         1.0f
                 );
 
             } else if (index == 2) {
+                // top - right
+                PointF point = calculateEmojiCoordinate(acx,acy,dp(85),-dp(47),group2Fraction);
                 gift.draw(
                         canvas,
-                        lerp(cacx + dp(200), cx, 0.5f * actionBarProgress), acy - dp(52),
-                        scale, -4.0f,
+                        point.x,
+                        point.y,
+                        Math.max(0.5f,scale* (1 - group2Fraction)),
+                        -4.0f,
                         alpha * alpha * (1.0f - expandProgress) * (1.0f - actionBarProgress) * (closedAlpha),
                         1.0f
                 );
@@ -387,10 +409,14 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
 //                    1.0f
 //                );
             } else if (index == 3) {
+                // bottom-left
+                PointF point = calculateEmojiCoordinate(acx,acy,-dp(72), dp(21),group2Fraction);
                 gift.draw(
                         canvas,
-                        lerp(cacx + Math.min(getWidth() * .27f, dp(56)), cx, 0.5f * actionBarProgress), acy + dp(18),
-                        scale, -4.0f,
+                        point.x,
+                        point.y,
+                        Math.max(0.5f,scale* (1 - group2Fraction)),
+                        -4.0f,
                         alpha * alpha * (1.0f - expandProgress) * (1.0f - actionBarProgress) * (closedAlpha),
                         1.0f
                 );
@@ -403,10 +429,14 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
 //                    1.0f
 //                );
             } else if (index == 4) {
+                // center-right
+                PointF point = calculateEmojiCoordinate(acx,acy,dp(100), -dp(14),group3Fraction);
                 gift.draw(
                         canvas,
-                        lerp(cacx + dp(220), cx, 0.5f * actionBarProgress), acy - dp(12),
-                        scale, -4.0f,
+                        point.x,
+                        point.y,
+                        Math.max(0.5f,scale* (1 - group3Fraction)),
+                        -4.0f,
                         alpha * alpha * (1.0f - expandProgress) * (1.0f - actionBarProgress) * (closedAlpha),
                         1.0f
                 );
@@ -418,10 +448,14 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
 //                    1.0f
 //                );
             } else if (index == 5) {
+                // center-left
+                PointF point = calculateEmojiCoordinate(acx,acy,-dp(90), -dp(12),group3Fraction);
                 gift.draw(
                         canvas,
-                        lerp(cacx + Math.min(getWidth() * .27f, dp(32)), cx, 0.5f * actionBarProgress), acy - dp(12),
-                        scale, -4.0f,
+                        point.x,
+                        point.y,
+                        Math.max(0.5f, scale * (1 - group3Fraction)),
+                        -4.0f,
                         alpha * alpha * (1.0f - expandProgress) * (1.0f - actionBarProgress) * (closedAlpha),
                         1.0f
                 );
@@ -437,6 +471,25 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
         }
 
         canvas.restore();
+    }
+
+    public static PointF calculateEmojiCoordinate(float centerX, float centerY, float targetX, float targetY, float fraction) {
+        // Your original logic uses 1 - fraction
+        float f = 1 - fraction;
+
+        float relX = targetX;
+        float relY = targetY;
+
+        float radius = (float) Math.sqrt(relX * relX + relY * relY);
+        float angle = (float) Math.atan2(relY, relX);
+
+        float rotatedAngle = angle + (float)(Math.PI / 4 * fraction);
+        float currentRadius = radius * f;
+
+        float x = centerX + (float) Math.cos(rotatedAngle) * currentRadius;
+        float y = centerY + (float) Math.sin(rotatedAngle) * currentRadius;
+
+        return new PointF(x, y);
     }
 
     public Gift getGiftUnder(float x, float y) {

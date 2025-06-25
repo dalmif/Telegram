@@ -10,6 +10,7 @@ package org.telegram.ui;
 
 import static androidx.core.view.ViewCompat.TYPE_TOUCH;
 import static org.telegram.messenger.AndroidUtilities.dp;
+import static org.telegram.messenger.AndroidUtilities.dpf2;
 import static org.telegram.messenger.AndroidUtilities.lerp;
 import static org.telegram.messenger.ContactsController.PRIVACY_RULES_TYPE_ADDED_BY_PHONE;
 import static org.telegram.messenger.LocaleController.formatPluralString;
@@ -40,10 +41,14 @@ import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.database.DataSetObserver;
 import android.graphics.Bitmap;
+import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ColorFilter;
+import android.graphics.ColorMatrix;
+import android.graphics.ColorMatrixColorFilter;
 import android.graphics.LinearGradient;
+import android.graphics.Matrix;
 import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.Path;
@@ -51,6 +56,7 @@ import android.graphics.PixelFormat;
 import android.graphics.Point;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
+import android.graphics.PorterDuffXfermode;
 import android.graphics.RadialGradient;
 import android.graphics.Rect;
 import android.graphics.RectF;
@@ -362,6 +368,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private HintView fwdRestrictedHint;
     private FrameLayout avatarContainer;
     private FrameLayout avatarContainer2;
+    private MetaBallView metaBallView;
     private DrawerProfileCell.AnimatedStatusView animatedStatusView;
     private AvatarImageView avatarImage;
     private View avatarOverlay;
@@ -476,6 +483,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private float avatarX;
     private float avatarY;
     private float avatarScale;
+    private float avatarOpacity;
     private float nameX;
     private float nameY;
     private float onlineX;
@@ -1170,7 +1178,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     if (loadedScale > 0) {
                         canvas.save();
                         canvas.clipRect(0, 0, getMeasuredWidth(), y1);
-                        StarGiftPatterns.drawProfilePattern(canvas, emoji, getMeasuredWidth(), ((actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0) + dp(144)) - (1f - extraHeight / dp(200)) * dp(50), Math.min(1f, extraHeight / dp(200)), full);
+                        StarGiftPatterns.drawProfilePattern(canvas, emoji, getMeasuredWidth(), ((actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0) + dp(144)) - (1f - extraHeight / dp(200)) * dp(50), Math.min(1f, extraHeight / dp(200)), full, avatarContainer.getX() + avatarContainer.getWidth() / 2f, avatarContainer.getY() + avatarContainer.getHeight() / 2f);
                         canvas.restore();
                     }
                 }
@@ -2232,6 +2240,119 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         if (layout != null && layout.getParentActivity() != null) {
             flagSecure = new FlagSecureReason(layout.getParentActivity().getWindow(), () -> currentEncryptedChat != null || getMessagesController().isChatNoForwards(currentChat));
         }
+    }
+
+    class MetaBallView extends View {
+        private float gooeyYCenter = 0;
+        private float radius = dp(89 / 2f);
+        private Paint paint;
+        private Paint gooeyPaint;
+        private float fraction;
+
+        private Paint gradientPaint;
+        private final float gradientRadiusOffset = dp(36);
+
+        public MetaBallView(Context context) {
+            super(context);
+            paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            paint.setColor(Color.BLACK);
+
+            gooeyPaint = new Paint();
+            gooeyPaint.setColorFilter(new ColorMatrixColorFilter(new float[] {
+                    1f, 0f, 0f, 0f, 0f,
+                    0f, 1f, 0f, 0f, 0f,
+                    0f, 0f, 1f, 0f, 0f,
+                    0f, 0f, 0f, 39f, -5000f
+            }));
+
+            gradientPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        }
+
+        @Override
+        protected void onDraw(@NonNull Canvas canvas) {
+            super.onDraw(canvas);
+//
+            canvas.saveLayer(
+                    0f,
+                    0f,
+                    getWidth(),
+                    getHeight(),
+                    gooeyPaint
+            );
+
+            float centerX1 = getWidth() / 2f;
+            float centerY1 = -200f;
+
+            float centerX2 = getWidth() / 2f;
+            float centerY2 = gooeyYCenter;
+
+            float outerRadius = Math.max(radius * (4.5f * (1 - Math.max(0.5f, fraction))), 1f);
+
+            RadialGradient gradient1 = new RadialGradient(
+                    centerX1, centerY1, 200 + 50,
+                    new int[]{Color.BLACK, Color.TRANSPARENT},
+                    new float[]{0f, 1f},
+                    Shader.TileMode.CLAMP
+            );
+            gradientPaint.setShader(gradient1);
+            canvas.drawCircle(centerX1, centerY1, 200 + 50, gradientPaint);
+
+            RadialGradient gradient2 = new RadialGradient(
+                    centerX2, centerY2, outerRadius,
+                    new int[]{Color.BLACK, Color.TRANSPARENT,},
+                    new float[]{0f, 1f},
+                    Shader.TileMode.CLAMP
+            );
+            gradientPaint.setShader(gradient2);
+            canvas.drawCircle(centerX2, centerY2, outerRadius, gradientPaint);
+
+
+            canvas.drawCircle(getWidth() / 2f, -200, 200f, paint);
+            canvas.drawCircle(getWidth() / 2f, gooeyYCenter, radius, paint);
+
+            canvas.restore();
+
+            Bitmap bitmap = Bitmap.createBitmap(dp(89), dp(89), Bitmap.Config.ARGB_8888);
+            Canvas canvas1 = new Canvas(bitmap);
+
+            avatarImage.draw(canvas1);
+
+            Utilities.stackBlurBitmap(bitmap, (int) ( 10 + (30 * (1-fraction))));
+            paint.setAlpha((int) (255f * fraction * fraction * fraction));
+            canvas.drawBitmap(createCircleBitmap(bitmap), null,
+                    new RectF((getWidth() / 2f) - radius, gooeyYCenter - radius,
+                            (getWidth() / 2f) + radius,
+                          gooeyYCenter + radius
+                    ),
+                    paint);
+        }
+
+        public void setGooey(float yCenter, float radius, float fraction) {
+            this.gooeyYCenter = yCenter;
+            this.radius = radius;
+            this.fraction = fraction;
+        }
+
+        private Bitmap createCircleBitmap(Bitmap bitmap) {
+            int width = bitmap.getWidth();
+            int height = bitmap.getHeight();
+            Bitmap output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(output);
+
+            final int color = 0xff424242;
+            final Paint paint = new Paint();
+            final Rect rect = new Rect(0, 0, width, height);
+
+            paint.setAntiAlias(true);
+            canvas.drawARGB(0, 0, 0, 0);
+            paint.setColor(color);
+            canvas.drawCircle(width / 2, height / 2, Math.min(width, height) / 2, paint);
+            paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+            canvas.drawBitmap(bitmap, rect, rect, paint);
+
+            return output;
+        }
+
     }
 
     @Override
@@ -4915,7 +5036,14 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         fallbackImage.setRoundRadius(AndroidUtilities.dp(11));
         AndroidUtilities.updateViewVisibilityAnimated(avatarContainer2, true, 1f, false);
         frameLayout.addView(avatarContainer2, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.START, 0, 0, 0, 0));
-        avatarContainer2.addView(avatarContainer, LayoutHelper.createFrame(83, 83, Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 0, 0, 0));
+
+        giftsView = new ProfileGiftsView(context, currentAccount, getDialogId(), avatarContainer, avatarImage, resourcesProvider);
+        avatarContainer2.addView(giftsView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+
+        metaBallView = new MetaBallView(context);
+        avatarContainer2.addView(metaBallView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.START, 0, 0, 0, 0));
+
+        avatarContainer2.addView(avatarContainer, LayoutHelper.createFrame(89, 89, Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 0, 0, 0));
         avatarImage = new AvatarImageView(context) {
             @Override
             public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
@@ -4939,6 +5067,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
             }
         };
+        avatarImage.setBlurAllowed(true);
         avatarImage.getImageReceiver().setAllowDecodeSingleFrame(true);
         avatarImage.setRoundRadius(getSmallAvatarRoundRadius());
         avatarImage.setPivotX(0);
@@ -5233,8 +5362,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             avatarImage.setHasStories(needInsetForStories());
         }
         avatarContainer2.addView(storyView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
-        giftsView = new ProfileGiftsView(context, currentAccount, getDialogId(), avatarContainer, avatarImage, resourcesProvider);
-        avatarContainer2.addView(giftsView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         updateProfileData(true);
 
         writeButton = new RLottieImageView(context);
@@ -5786,8 +5913,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         avatarImage.setForegroundAlpha(value);
 
         final FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) avatarContainer.getLayoutParams();
-        params.width = (int) AndroidUtilities.lerp(AndroidUtilities.dpf2(83f), listView.getMeasuredWidth() / avatarScale, value);
-        params.height = (int) AndroidUtilities.lerp(AndroidUtilities.dpf2(83f), heightOfAvatarContainer, value);
+        params.width = (int) AndroidUtilities.lerp(AndroidUtilities.dpf2(89f), listView.getMeasuredWidth() / avatarScale, value);
+        params.height = (int) AndroidUtilities.lerp(AndroidUtilities.dpf2(89f), heightOfAvatarContainer, value);
         avatarContainer.requestLayout();
 
         updateCollectibleHint();
@@ -5800,7 +5927,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 return AndroidUtilities.dp(needInsetForStories() ? 11 : 16);
             }
         }
-        return AndroidUtilities.dp(83 / 2);
+        return AndroidUtilities.dp(89 / 2);
     }
 
     private void updateTtlIcon() {
@@ -7342,14 +7469,14 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
                 if (giftsView != null) {
                     giftsView.setExpandCoords(avatarContainer2.getMeasuredWidth() - AndroidUtilities.dp(40), writeButtonVisible, (actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0) + ActionBar.getCurrentActionBarHeight() + extraHeight + searchTransitionOffset);
+                    giftsView.setCollapseProgress(1 - diff);
                 }
             }
 
             avatarX = 0;
             avatarY = (((actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0)
-                    + ActionBar.getCurrentActionBarHeight() / 2.0f
-                    + 16 * AndroidUtilities.density) * diff)
-                    + ((((avatarContainer.getHeight() * avatarContainer.getScaleY()) - avatarContainer.getHeight()) / 2) * (1 - diff))
+                    + 27 * AndroidUtilities.density) * diff)
+                    - ((((avatarContainer.getHeight() - (avatarContainer.getHeight() * avatarContainer.getScaleY())) / 2) + dp(78)) * (1 - diff))
 
 //                    + 27 * AndroidUtilities.density * diff
 //                    + actionBar.getTranslationY()
@@ -7358,7 +7485,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             float h = openAnimationInProgress ? initialAnimationExtraHeight : extraHeight;
             if (h > AndroidUtilities.dp(200f) || isPulledDown) {
                 expandProgress = Math.max(0f, Math.min(1f, (h - AndroidUtilities.dp(200f)) / (listView.getMeasuredWidth() - newTop - AndroidUtilities.dp(200f))));
-                avatarScale = AndroidUtilities.lerp((83f + 18f) / 83f, (83f + 10f + 18f) / 83f, Math.min(1f, expandProgress * 3f));
+                avatarScale = AndroidUtilities.lerp((89f + 18f) / 89f, (89f + 10f + 18f) / 89f, Math.min(1f, expandProgress * 3f));
                 if (storyView != null) {
                     storyView.invalidate();
                 }
@@ -7525,7 +7652,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 nameTextView[1].setScaleX(1.67f);
                 nameTextView[1].setScaleY(1.67f);
 
-                avatarScale = AndroidUtilities.lerp(1.0f, (83f + 10f + 18f) / 83f, avatarAnimationProgress);
+                avatarScale = AndroidUtilities.lerp(1.0f, (89f + 10f + 18f) / 89f, avatarAnimationProgress);
                 if (storyView != null) {
                     storyView.setExpandProgress(1f);
                 }
@@ -7538,7 +7665,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 // The animation that feels that the avatar is closed exploiting
                 avatarContainer.setTranslationX(AndroidUtilities.lerp(avX, 0, avatarAnimationProgress));
                 avatarContainer.setTranslationY(AndroidUtilities.lerp((float) Math.ceil(avY), 0f, avatarAnimationProgress));
-                float extra = (avatarContainer.getMeasuredWidth() - AndroidUtilities.dp(83)) * avatarScale;
+                float extra = (avatarContainer.getMeasuredWidth() - AndroidUtilities.dp(89)) * avatarScale;
                 timeItem.setTranslationX(avatarContainer.getX() + AndroidUtilities.dp(16) + extra);
                 timeItem.setTranslationY(avatarContainer.getY() + AndroidUtilities.dp(15) + extra);
                 starBgItem.setTranslationX(avatarContainer.getX() + AndroidUtilities.dp(28) + extra);
@@ -7568,7 +7695,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 updateEmojiStatusDrawableColor(avatarAnimationProgress);
 
                 final FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) avatarContainer.getLayoutParams();
-                params.width = params.height = (int) AndroidUtilities.lerp(AndroidUtilities.dpf2(83f), (extraHeight + newTop) / avatarScale, avatarAnimationProgress);
+                params.width = params.height = (int) AndroidUtilities.lerp(AndroidUtilities.dpf2(89f), (extraHeight + newTop) / avatarScale, avatarAnimationProgress);
                 avatarContainer.requestLayout();
 
                 updateCollectibleHint();
@@ -7578,7 +7705,21 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 // The toolbar is collapsing here
 
                 // diff is the expand fraction (full expand = 1, full collapse = 0)
-                avatarScale = (83 - 83 * (1 - diff)) / 83.0f;
+//                avatarScale = (89 - 89 * (1 - diff)) / 89.0f;
+                avatarScale = Math.max(dpf2(30)/ dpf2(89),(89 - 89 * (1 - diff)) / 89.0f);
+                Log.i("mmd","Here is diff" + diff);
+                if (metaBallView != null) {
+                    metaBallView.setGooey(
+                            avatarY + (avatarContainer.getHeight() / 2),
+                            (avatarContainer.getHeight() * avatarContainer.getScaleY()) / 2,
+                            diff
+                    );
+                    metaBallView.invalidate();
+                }
+                avatarImage.setHasBlur(true);
+                avatarImage.onNewImageSet();
+
+                avatarOpacity = (float) Math.exp(-10 * (1.0 - diff));
                 if (storyView != null) {
                     storyView.invalidate();
                 }
@@ -7593,7 +7734,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     avatarContainer.setScaleY(avatarScale);
                     avatarContainer.setTranslationX(avatarX);
                     avatarContainer.setTranslationY((float) Math.ceil(avatarY));
-                    float extra = AndroidUtilities.dp(83) * avatarScale - AndroidUtilities.dp(83);
+                    avatarImage.setAlpha(avatarOpacity);
+                    float extra = AndroidUtilities.dp(89) * avatarScale - AndroidUtilities.dp(89);
                     timeItem.setTranslationX(avatarContainer.getX() + AndroidUtilities.dp(16) + extra);
                     timeItem.setTranslationY(avatarContainer.getY() + AndroidUtilities.dp(15) + extra);
                     starBgItem.setTranslationX(avatarContainer.getX() + AndroidUtilities.dp(28) + extra);
@@ -7720,10 +7862,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     }
 
     private void refreshNameAndOnlineXY() {
-        nameX = AndroidUtilities.dp(-21f) + avatarContainer.getMeasuredWidth() * (avatarScale - (83f + 18f) / 83f);
-        nameY = ((float) Math.floor(avatarY) + AndroidUtilities.dp(1.3f) + AndroidUtilities.dp(7f) + avatarContainer.getMeasuredHeight() * (avatarScale - (83f + 4f) / 83f) / 2f) + dp(88);
-        onlineX = AndroidUtilities.dp(-21f) + avatarContainer.getMeasuredWidth() * (avatarScale - (83f + 18f) / 83f);
-        onlineY = ((float) Math.floor(avatarY) + AndroidUtilities.dp(24) + (float) Math.floor(11 * AndroidUtilities.density) + avatarContainer.getMeasuredHeight() * (avatarScale - (83f + 4f) / 83f) / 2f) + dp(88);
+        nameX = AndroidUtilities.dp(-21f) + avatarContainer.getMeasuredWidth() * (avatarScale - (89f + 18f) / 89f);
+        nameY = ((float) Math.floor(avatarY) + AndroidUtilities.dp(1.3f) + AndroidUtilities.dp(7f) + avatarContainer.getMeasuredHeight() * (avatarScale - (89f + 4f) / 89f) / 2f) + dp(88);
+        onlineX = AndroidUtilities.dp(-21f) + avatarContainer.getMeasuredWidth() * (avatarScale - (89f + 18f) / 89f);
+        onlineY = ((float) Math.floor(avatarY) + AndroidUtilities.dp(24) + (float) Math.floor(11 * AndroidUtilities.density) + avatarContainer.getMeasuredHeight() * (avatarScale - (89f + 4f) / 89f) / 2f) + dp(88);
     }
 
     public RecyclerListView getListView() {
@@ -12739,7 +12881,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 new SearchResult(103, getString(R.string.PrivacyProfilePhoto), getString(R.string.PrivacySettings), R.drawable.msg_secret, () -> presentFragment(new PrivacyControlActivity(ContactsController.PRIVACY_RULES_TYPE_PHOTO, true))),
                 new SearchResult(104, getString(R.string.PrivacyForwards), getString(R.string.PrivacySettings), R.drawable.msg_secret, () -> presentFragment(new PrivacyControlActivity(ContactsController.PRIVACY_RULES_TYPE_FORWARDS, true))),
                 new SearchResult(122, getString(R.string.PrivacyP2P), getString(R.string.PrivacySettings), R.drawable.msg_secret, () -> presentFragment(new PrivacyControlActivity(ContactsController.PRIVACY_RULES_TYPE_P2P, true))),
-                new SearchResult(83, getString(R.string.Calls), getString(R.string.PrivacySettings), R.drawable.msg_secret, () -> presentFragment(new PrivacyControlActivity(ContactsController.PRIVACY_RULES_TYPE_CALLS, true))),
+                new SearchResult(89, getString(R.string.Calls), getString(R.string.PrivacySettings), R.drawable.msg_secret, () -> presentFragment(new PrivacyControlActivity(ContactsController.PRIVACY_RULES_TYPE_CALLS, true))),
                 new SearchResult(107, getString(R.string.PrivacyInvites), getString(R.string.PrivacySettings), R.drawable.msg_secret, () -> presentFragment(new PrivacyControlActivity(ContactsController.PRIVACY_RULES_TYPE_INVITE, true))),
                 new SearchResult(123, getString(R.string.PrivacyVoiceMessages), getString(R.string.PrivacySettings), R.drawable.msg_secret, () -> {
                     if (!getUserConfig().isPremium()) {
