@@ -369,6 +369,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private FrameLayout avatarContainer;
     private FrameLayout avatarContainer2;
     private MetaBallView metaBallView;
+    private ButtonContainer buttonContainer;
     private DrawerProfileCell.AnimatedStatusView animatedStatusView;
     private AvatarImageView avatarImage;
     private View avatarOverlay;
@@ -488,6 +489,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private float nameY;
     private float onlineX;
     private float onlineY;
+    private float buttonContainerY;
     private float expandProgress;
     private float listViewVelocityY;
     private ValueAnimator expandAnimator;
@@ -2242,6 +2244,75 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
     }
 
+    class ButtonContainer extends View {
+        private int buttonCount = 4;
+        private final Paint paint;
+        private final float spacing = dp(5);
+        private final float radius = dp(9);
+
+        public ButtonContainer(Context context) {
+            super(context);
+            paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        }
+
+
+        public void calculatePaint() {
+            if (topView.getWidth() > 0) {
+                ColorMatrix colorMatrix = new ColorMatrix();
+                colorMatrix.setSaturation(1.6f);
+                AndroidUtilities.multiplyBrightnessColorMatrix(colorMatrix, true ? .9f : .84f);
+                AndroidUtilities.adjustBrightnessColorMatrix(colorMatrix, true ? -.04f : +.06f);
+
+                Bitmap bitmap = Bitmap.createBitmap(topView.getWidth(), topView.getHeight(), Bitmap.Config.ARGB_8888);
+                Canvas canvas = new Canvas(bitmap);
+                topView.draw(canvas);
+                paint.setColor(0);
+                paint.setFilterBitmap(true);
+                BitmapShader shader = new BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+
+                // Calculate how much to shift the shader so the bottom aligns
+                Matrix matrix = new Matrix();
+                float translateY = dp(156) - bitmap.getHeight();
+                matrix.setTranslate(0, translateY);
+                shader.setLocalMatrix(matrix);
+
+                paint.setShader(shader);
+                paint.setColorFilter(new ColorMatrixColorFilter(colorMatrix));
+                paint.setAlpha(0xff);
+                invalidate();
+            }
+
+        }
+        public void setButtonCount(int count) {
+            this.buttonCount = Math.max(1, count);
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+
+            if (buttonCount <= 0) return;
+
+            int width = getWidth() - getPaddingLeft() - getPaddingRight();
+            int height = getHeight() - getPaddingTop() - getPaddingBottom();
+
+            float totalSpacing = spacing * (buttonCount - 1);
+            float buttonWidth = (width - totalSpacing) / buttonCount;
+            float buttonHeight = height;
+
+            float top = getPaddingTop();
+            float bottom = top + buttonHeight;
+
+            for (int i = 0; i < buttonCount; i++) {
+                float left = getPaddingLeft() + i * (buttonWidth + spacing);
+                float right = left + buttonWidth;
+                RectF rect = new RectF(left, top, right, bottom);
+                canvas.drawRoundRect(rect, radius, radius, paint);
+            }
+        }
+    }
+
     class MetaBallView extends View {
         private float gooeyYCenter = 0;
         private float radius = dp(89 / 2f);
@@ -2271,14 +2342,22 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         @Override
         protected void onDraw(@NonNull Canvas canvas) {
             super.onDraw(canvas);
-//
-            canvas.saveLayer(
-                    0f,
-                    0f,
-                    getWidth(),
-                    getHeight(),
-                    gooeyPaint
-            );
+
+            RectF rectf = new RectF(0f ,0f,getWidth(),getHeight());
+            canvas.save();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                canvas.saveLayer(
+                        rectf,
+                        gooeyPaint
+                );
+            }
+            else {
+                canvas.saveLayer(
+                        rectf,
+                        gooeyPaint,
+                        Canvas.ALL_SAVE_FLAG
+                );
+            }
 
             float centerX1 = getWidth() / 2f;
             float centerY1 = -200f;
@@ -5042,7 +5121,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
         metaBallView = new MetaBallView(context);
         avatarContainer2.addView(metaBallView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.START, 0, 0, 0, 0));
-
+        buttonContainer = new ButtonContainer(context);
         avatarContainer2.addView(avatarContainer, LayoutHelper.createFrame(89, 89, Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 0, 0, 0));
         avatarImage = new AvatarImageView(context) {
             @Override
@@ -5184,6 +5263,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             avatarsViewPager.setChatInfo(chatInfo);
         }
         avatarContainer2.addView(avatarsViewPager);
+        avatarContainer2.addView(buttonContainer, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 56, Gravity.TOP, 10, 0, 10, 0));
         avatarContainer2.addView(overlaysView);
         avatarImage.setAvatarsViewPager(avatarsViewPager);
 
@@ -5380,6 +5460,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             writeButton.setContentDescription(LocaleController.getString(R.string.ViewDiscussion));
         }
         writeButton.setScaleType(ImageView.ScaleType.CENTER);
+        writeButton.setVisibility(View.GONE);
 
         frameLayout.addView(writeButton, LayoutHelper.createFrame(60, 60, Gravity.RIGHT | Gravity.TOP, 0, 0, 16, 0));
         writeButton.setOnClickListener(v -> {
@@ -7388,6 +7469,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             }
         }
 
+        // TODO: Remove this line and call it once we have the topview ready
+        buttonContainer.calculatePaint();
         if (avatarContainer != null) {
             final float diff = Math.min(1f, extraHeight / AndroidUtilities.dp(200f));
 
@@ -7478,7 +7561,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 //                    + 27 * AndroidUtilities.density * diff
 //                    + actionBar.getTranslationY()
             ;
-
+            buttonContainerY = extraHeight;
+            buttonContainer.setTranslationY(buttonContainerY);
             float h = openAnimationInProgress ? initialAnimationExtraHeight : extraHeight;
             if (h > AndroidUtilities.dp(200f) || isPulledDown) {
                 expandProgress = Math.max(0f, Math.min(1f, (h - AndroidUtilities.dp(200f)) / (listView.getMeasuredWidth() - newTop - AndroidUtilities.dp(200f))));
