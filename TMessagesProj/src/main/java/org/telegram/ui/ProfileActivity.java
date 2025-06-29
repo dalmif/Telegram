@@ -3191,7 +3191,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         paddingTop = AndroidUtilities.dp(200f);
                         paddingBottom = 0;
                     } else {
-                        paddingTop = listView.getMeasuredWidth();
+                        // BOOKMARK: This is the padding that let the listView to have more padding from top
+                        paddingTop = listView.getMeasuredWidth() + dp(85);
                         paddingBottom = Math.max(0, getMeasuredHeight() - (listContentHeight + AndroidUtilities.dp(200) + actionBarHeight));
                     }
                     if (banFromGroup != 0) {
@@ -3918,12 +3919,14 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
                 final boolean result = super.onTouchEvent(e);
                 if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                    // BOOKMARK: It alows to run the animation when we need to make the whole profile
+                    //  into just three states (stable, expand, collapse)
                     if (allowPullingDown) {
                         final View view = layoutManager.findViewByPosition(0);
                         if (view != null) {
                             if (isPulledDown) {
                                 final int actionBarHeight = ActionBar.getCurrentActionBarHeight() + (actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0);
-                                listView.smoothScrollBy(0, view.getTop() - listView.getMeasuredWidth() + actionBarHeight, CubicBezierInterpolator.EASE_OUT_QUINT);
+                                listView.smoothScrollBy(0, view.getTop() - listView.getMeasuredWidth() + actionBarHeight - dp(85), CubicBezierInterpolator.EASE_OUT_QUINT);
                             } else {
                                 listView.smoothScrollBy(0, view.getTop() - AndroidUtilities.dp(200), CubicBezierInterpolator.EASE_OUT_QUINT);
                             }
@@ -4024,8 +4027,12 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             public int scrollVerticallyBy(int dy, RecyclerView.Recycler recycler, RecyclerView.State state) {
                 final View view = layoutManager.findViewByPosition(0);
                 if (view != null && !openingAvatar) {
+                    // BOOKMARK: can scroll doesn't allow the scroll remains at the overscroll position
+                    // it always keep the first item on offset != 0 and this is the trick that how
+                    // the overscroll is implemented.
                     final int canScroll = view.getTop() - AndroidUtilities.dp(200);
                     if (!allowPullingDown && canScroll > dy) {
+                        // When it was completely (or partially) small and it want to be the stable size or more
                         dy = canScroll;
                         if (avatarsViewPager.hasImages() && avatarImage.getImageReceiver().hasNotThumb() && !AndroidUtilities.isAccessibilityScreenReaderEnabled() && !isInLandscapeMode && !AndroidUtilities.isTablet()) {
                             allowPullingDown = avatarBig == null;
@@ -4033,6 +4040,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     } else if (allowPullingDown) {
                         if (dy >= canScroll) {
                             dy = canScroll;
+                            // when it is getting small (from the stable point) if it's already smaller from the stable point it won't be called
                             allowPullingDown = false;
                         } else if (listView.getScrollState() == RecyclerListView.SCROLL_STATE_DRAGGING) {
                             if (!isPulledDown) {
@@ -7700,7 +7708,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         expandAnimator.start();
                     }
 
-                    // COMMENT: Animate the avatar when the action bar get expaneded/collapsed
+                    // BOOKMARK: Animate the avatar when the action bar get expaneded/collapsed
                     avatarContainer.setScaleX(avatarScale);
                     avatarContainer.setScaleY(avatarScale);
 
@@ -7742,7 +7750,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
 
                 avatarImage.setRoundRadius((int) AndroidUtilities.lerp(getSmallAvatarRoundRadius(), 0f, avatarAnimationProgress));
-                // COMMENT: It make the image bigger when we scroll up before the animation occur
+                // BOOKMARK: It make the image bigger when we scroll up before the animation occur
                 // The animation that feels that the avatar is closed exploiting
                 avatarContainer.setTranslationX(AndroidUtilities.lerp(avX, 0, avatarAnimationProgress));
                 avatarContainer.setTranslationY(AndroidUtilities.lerp((float) Math.ceil(avY), 0f, avatarAnimationProgress));
@@ -7809,7 +7817,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
                 float nameScale = 1.0f + 0.12f * diff;
                 if (expandAnimator == null || !expandAnimator.isRunning()) {
-                    // COMMENT: animate Size of the avatar smaller when we scroll down and the action bar get smaller
+                    // BOOKMARK: animate Size of the avatar smaller when we scroll down and the action bar get smaller
                     // actually this cause the scale be always more than 1 and it's 1 when we scroll down and the picture goes to the smallest state (the real 42.dp)
                     avatarContainer.setScaleX(avatarScale);
                     avatarContainer.setScaleY(avatarScale);
