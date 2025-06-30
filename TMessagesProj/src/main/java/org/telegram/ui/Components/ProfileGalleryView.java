@@ -5,22 +5,34 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.LinearGradient;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PointF;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
 import android.graphics.RectF;
+import android.graphics.Shader;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.text.TextUtils;
 import android.util.SparseArray;
+import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.google.android.exoplayer2.util.Log;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.DialogObject;
@@ -121,7 +133,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
     private static class Item {
         boolean isActiveVideo;
         private View textureViewStubView;
-        private AvatarImageView imageView;
+        private ImageWithBlurAtBottom avatarWithBlur;
     }
 
     public interface Callback {
@@ -630,7 +642,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
 
     public BackupImageView getCurrentItemView() {
         if (adapter != null && !adapter.objects.isEmpty()) {
-            return adapter.objects.get(getCurrentItem()).imageView;
+            return adapter.objects.get(getCurrentItem()).avatarWithBlur.avatarImageView;
         } else {
             return null;
         }
@@ -1080,10 +1092,94 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
         }
     }
 
+    static class ImageWithBlurAtBottom extends FrameLayout {
+        final AvatarImageView avatarImageView;
+        boolean isBlurAdded = false;
+        public ImageWithBlurAtBottom(Context context, AvatarImageView avatarImageView) {
+            super(context);
+            this.avatarImageView = avatarImageView;
+            init(context, avatarImageView);
+        }
+
+        public void addBlur() {
+            if (!isBlurAdded) {
+                isBlurAdded = true;
+                View blurSpacer = new View(getContext());
+                LayoutParams blurParams = new LayoutParams(
+                        LayoutParams.MATCH_PARENT,
+                        AndroidUtilities.dp(140),
+                        Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL
+                );
+                Bitmap originalImage = avatarImageView.getImageReceiver().getBitmap();
+                Bitmap blurBitmap = Utilities.stackBlurBitmapMax(originalImage);
+                // blur the bitmap and get the 3 last dp, it produce almost the same effect as
+                // design, I'll come back later to check if I can implement it in a better way.
+                Drawable drawable = new BitmapDrawable(getResources(), createFadedBottomBitmap(blurBitmap));
+                blurSpacer.setBackground(drawable);
+                addView(blurSpacer, blurParams);
+            }
+        }
+        public Bitmap createFadedBottomBitmap(Bitmap source) {
+            int totalHeightPx = AndroidUtilities.dp( 100);
+            int fadeHeightPx = AndroidUtilities.dp(30);
+            int ignoreBottomPx = AndroidUtilities.dp(1);
+            int sliceHeightPx = AndroidUtilities.dp(3);
+
+            int width = source.getWidth();
+            int sourceHeight = source.getHeight();
+
+            int sliceStartY = Math.max(0, sourceHeight - ignoreBottomPx - sliceHeightPx);
+            Bitmap slice = Bitmap.createBitmap(source, 0, sliceStartY, width, sliceHeightPx);
+
+            Matrix flipMatrix = new Matrix();
+            flipMatrix.preScale(1f, -1f);
+            Bitmap flippedSlice = Bitmap.createBitmap(slice, 0, 0, width, sliceHeightPx, flipMatrix, false);
+
+            Bitmap result = Bitmap.createBitmap(width, totalHeightPx, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(result);
+
+            Bitmap lastRow = Bitmap.createBitmap(flippedSlice, 0, flippedSlice.getHeight() - 1, width, 1);
+            Shader clampShader = new BitmapShader(lastRow, Shader.TileMode.CLAMP, Shader.TileMode.REPEAT);
+            Paint clampPaint = new Paint();
+            clampPaint.setShader(clampShader);
+            canvas.drawRect(0, 0, width, totalHeightPx, clampPaint);
+
+            Paint maskPaint = new Paint();
+            Shader fadeShader = new LinearGradient(
+                    0, 0, 0, fadeHeightPx,
+                    Color.TRANSPARENT, Color.BLACK,
+                    Shader.TileMode.CLAMP
+            );
+            maskPaint.setShader(fadeShader);
+            maskPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_IN));
+
+            canvas.drawRect(0, 0, width, fadeHeightPx, maskPaint);
+
+            return result;
+        }
+        private void init(Context context, AvatarImageView avatarImageView) {
+            LinearLayout linearLayout = new LinearLayout(context);
+            linearLayout.setOrientation(LinearLayout.VERTICAL);
+            setBackgroundColor(0xFF000000);
+
+            LinearLayout.LayoutParams avatarParams = new LinearLayout.LayoutParams(
+                    LayoutParams.MATCH_PARENT, 0, 1f
+            );
+            linearLayout.addView(avatarImageView, avatarParams);
+            View blurSpacer = new View(getContext());
+            LinearLayout.LayoutParams blurParams = new LinearLayout.LayoutParams(
+                    LayoutParams.MATCH_PARENT,
+                    AndroidUtilities.dp(85)
+            );
+            linearLayout.addView(blurSpacer, blurParams);
+            addView(linearLayout);
+        }
+    }
+
     public class ViewPagerAdapter extends Adapter {
 
         private final ArrayList<Item> objects = new ArrayList<>();
-        private final ArrayList<BackupImageView> imageViews = new ArrayList<>();
+        private final ArrayList<ImageWithBlurAtBottom> imageViews = new ArrayList<>();
 
         private final Context context;
         private final Paint placeholderPaint;
@@ -1109,7 +1205,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
             if (item.isActiveVideo) {
                 return view == item.textureViewStubView;
             }
-            return view == item.imageView;
+            return view == item.avatarWithBlur;
         }
 
         @Override
@@ -1139,28 +1235,55 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
             if (item.textureViewStubView != null && item.textureViewStubView.getParent() != null) {
                 container.removeView(item.textureViewStubView);
             }
-            if (item.imageView == null) {
-                item.imageView = new AvatarImageView(context, position, placeholderPaint);
-                imageViews.set(position, item.imageView);
+            if (item.avatarWithBlur == null) {
+//                AvatarImageView avatar = new AvatarImageView(context, position, placeholderPaint);
+//                item.imageView = avatar;
+//                item.avatarWithBlur = new ImageWithBlurAtBottom(context, avatar);
+//                imageViews.set(position, item.avatarWithBlur);
+                item.avatarWithBlur = new ImageWithBlurAtBottom(context, new AvatarImageView(context, position, placeholderPaint));
+                imageViews.set(position, item.avatarWithBlur);
             }
 
-            if (item.imageView.getParent() == null) {
-                container.addView(item.imageView);
+            if (item.avatarWithBlur.getParent() == null) {
+                // BOOKMARK: This is the view that is added to pager
+//                FrameLayout a = new FrameLayout(context);
+//                a.setBackgroundColor(Color.BLACK);
+//                ViewGroup.LayoutParams params = new ViewGroup.LayoutParams(
+//                        AndroidUtilities.dp(280),
+//                        AndroidUtilities.dp(280)
+//                );
+//                a.setLayoutParams(params);
+//                a.addView(item.avatarWithBlur, AndroidUtilities.dp(180), AndroidUtilities.dp(180));
+                container.addView(item.avatarWithBlur);
             }
 
-            item.imageView.getImageReceiver().setAllowDecodeSingleFrame(true);
+            item.avatarWithBlur.avatarImageView.getImageReceiver().setAllowDecodeSingleFrame(true);
             int imageLocationPosition = hasActiveVideo ? realPosition - 1 : realPosition;
+            item.avatarWithBlur.avatarImageView.getImageReceiver().setDelegate(new ImageReceiver.ImageReceiverDelegate() {
+                @Override
+                public void didSetImage(ImageReceiver imageReceiver, boolean set, boolean thumb, boolean memCache) {
+                    if (!thumb) {
+                        item.avatarWithBlur.addBlur();
+                    }
+                }
+
+                @Override
+                public void onAnimationReady(ImageReceiver imageReceiver) {
+                    callback.onVideoSet();
+                }
+            });
             boolean needProgress = false;
             if (imageLocationPosition == 0) {
+                Log.i("hadi","first: " + parentAvatarImageView.getImageReceiver());
                 Drawable drawable = parentAvatarImageView == null ? null : parentAvatarImageView.getImageReceiver().getDrawable();
                 if (drawable instanceof AnimatedFileDrawable && ((AnimatedFileDrawable) drawable).hasBitmap()) {
                     AnimatedFileDrawable animatedFileDrawable = (AnimatedFileDrawable) drawable;
-                    item.imageView.setImageDrawable(drawable);
-                    animatedFileDrawable.addSecondParentView(item.imageView);
+                    item.avatarWithBlur.avatarImageView.setImageDrawable(drawable);
+                    animatedFileDrawable.addSecondParentView(item.avatarWithBlur.avatarImageView);
                     animatedFileDrawable.setInvalidateParentViewWithSecond(true);
                 } else if (imageLocationPosition >= 0 && imageLocationPosition < videoLocations.size()) {
                     ImageLocation videoLocation = videoLocations.get(imageLocationPosition);
-                    item.imageView.isVideo = videoLocation != null;
+                    item.avatarWithBlur.avatarImageView.isVideo = videoLocation != null;
                     needProgress = vectorAvatars.get(imageLocationPosition) == null;
                     String filter;
                     if (isProfileFragment && videoLocation != null && videoLocation.imageType == FileLoader.IMAGE_TYPE_ANIMATION) {
@@ -1172,34 +1295,34 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
                     Bitmap thumb = (parentAvatarImageView == null || !createThumbFromParent) ? null : parentAvatarImageView.getImageReceiver().getBitmap();
                     String parent = "avatar_" + dialogId;
                     if (thumb != null && vectorAvatars.get(imageLocationPosition) == null) {
-                        item.imageView.setImageMedia(videoLocations.get(imageLocationPosition), filter, imagesLocations.get(imageLocationPosition), null, thumb, imagesLocationsSizes.get(imageLocationPosition), 1, parent);
+                        item.avatarWithBlur.avatarImageView.setImageMedia(videoLocations.get(imageLocationPosition), filter, imagesLocations.get(imageLocationPosition), null, thumb, imagesLocationsSizes.get(imageLocationPosition), 1, parent);
                     } else if (uploadingImageLocation != null) {
-                        item.imageView.setImageMedia(vectorAvatars.get(imageLocationPosition), videoLocations.get(imageLocationPosition), filter, imagesLocations.get(imageLocationPosition), null, uploadingImageLocation, null, null, imagesLocationsSizes.get(imageLocationPosition), 1, parent);
+                        item.avatarWithBlur.avatarImageView.setImageMedia(vectorAvatars.get(imageLocationPosition), videoLocations.get(imageLocationPosition), filter, imagesLocations.get(imageLocationPosition), null, uploadingImageLocation, null, null, imagesLocationsSizes.get(imageLocationPosition), 1, parent);
                     } else {
                         String thumbFilter = location != null && location.photoSize instanceof TLRPC.TL_photoStrippedSize ? "b" : null;
-                        item.imageView.setImageMedia(vectorAvatars.get(imageLocationPosition), videoLocation, null, imagesLocations.get(imageLocationPosition), null, thumbsLocations.get(imageLocationPosition), thumbFilter, null, imagesLocationsSizes.get(imageLocationPosition), 1, parent);
+                        item.avatarWithBlur.avatarImageView.setImageMedia(vectorAvatars.get(imageLocationPosition), videoLocation, null, imagesLocations.get(imageLocationPosition), null, thumbsLocations.get(imageLocationPosition), thumbFilter, null, imagesLocationsSizes.get(imageLocationPosition), 1, parent);
                     }
                 }
             } else if (imageLocationPosition >= 0 && imageLocationPosition < videoLocations.size()) {
                 final ImageLocation videoLocation = videoLocations.get(imageLocationPosition);
-                item.imageView.isVideo = videoLocation != null;
+                item.avatarWithBlur.avatarImageView.isVideo = videoLocation != null;
                 needProgress = vectorAvatars.get(imageLocationPosition) == null;
                 ImageLocation location = thumbsLocations.get(imageLocationPosition);
                 String filter = (location != null && location.photoSize instanceof TLRPC.TL_photoStrippedSize) ? "b" : null;
                 String parent = "avatar_" + dialogId;
-                item.imageView.setImageMedia(vectorAvatars.get(imageLocationPosition), videoLocation, null, imagesLocations.get(imageLocationPosition), null, thumbsLocations.get(imageLocationPosition), filter, null, imagesLocationsSizes.get(imageLocationPosition), 1, parent);
+                item.avatarWithBlur.avatarImageView.setImageMedia(vectorAvatars.get(imageLocationPosition), videoLocation, null, imagesLocations.get(imageLocationPosition), null, thumbsLocations.get(imageLocationPosition), filter, null, imagesLocationsSizes.get(imageLocationPosition), 1, parent);
             }
             if (imageLocationPosition >= 0 && imageLocationPosition < imagesUploadProgress.size() && imagesUploadProgress.get(imageLocationPosition) != null) {
                 needProgress = true;
             }
             if (needProgress) {
-                item.imageView.radialProgress = radialProgresses.get(imageLocationPosition);
-                if (item.imageView.radialProgress == null) {
-                    item.imageView.radialProgress = new RadialProgress2(item.imageView);
-                    item.imageView.radialProgress.setOverrideAlpha(0.0f);
-                    item.imageView.radialProgress.setIcon(MediaActionDrawable.ICON_EMPTY, false, false);
-                    item.imageView.radialProgress.setColors(0x42000000, 0x42000000, Color.WHITE, Color.WHITE);
-                    radialProgresses.append(imageLocationPosition, item.imageView.radialProgress);
+                item.avatarWithBlur.avatarImageView.radialProgress = radialProgresses.get(imageLocationPosition);
+                if (item.avatarWithBlur.avatarImageView.radialProgress == null) {
+                    item.avatarWithBlur.avatarImageView.radialProgress = new RadialProgress2(item.avatarWithBlur.avatarImageView);
+                    item.avatarWithBlur.avatarImageView.radialProgress.setOverrideAlpha(0.0f);
+                    item.avatarWithBlur.avatarImageView.radialProgress.setIcon(MediaActionDrawable.ICON_EMPTY, false, false);
+                    item.avatarWithBlur.avatarImageView.radialProgress.setColors(0x42000000, 0x42000000, Color.WHITE, Color.WHITE);
+                    radialProgresses.append(imageLocationPosition, item.avatarWithBlur.avatarImageView.radialProgress);
                 }
                 if (invalidateWithParent) {
                     invalidate();
@@ -1207,21 +1330,11 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
                     postInvalidateOnAnimation();
                 }
             }
-            item.imageView.getImageReceiver().setDelegate(new ImageReceiver.ImageReceiverDelegate() {
-                @Override
-                public void didSetImage(ImageReceiver imageReceiver, boolean set, boolean thumb, boolean memCache) {
 
-                }
+            item.avatarWithBlur.avatarImageView.getImageReceiver().setCrossfadeAlpha((byte) 2);
 
-                @Override
-                public void onAnimationReady(ImageReceiver imageReceiver) {
-                    callback.onVideoSet();
-                }
-            });
-            item.imageView.getImageReceiver().setCrossfadeAlpha((byte) 2);
-
-            item.imageView.setRoundRadius(roundTopRadius, roundTopRadius, roundBottomRadius, roundBottomRadius);
-            item.imageView.setTag(realPosition);
+            item.avatarWithBlur.avatarImageView.setRoundRadius(roundTopRadius, roundTopRadius, roundBottomRadius, roundBottomRadius);
+            item.avatarWithBlur.avatarImageView.setTag(realPosition);
             return item;
         }
 
@@ -1234,7 +1347,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
             if (item.isActiveVideo) {
                 return;
             }
-            BackupImageView imageView = item.imageView;
+            BackupImageView imageView = item.avatarWithBlur.avatarImageView;
             if (imageView.getImageReceiver().hasStaticThumb()) {
                 Drawable drawable = imageView.getImageReceiver().getDrawable();
                 if (drawable instanceof AnimatedFileDrawable) {
@@ -1256,7 +1369,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
         public void notifyDataSetChanged() {
             for (int i = 0; i < imageViews.size(); i++) {
                 if (imageViews.get(i) != null) {
-                    imageViews.get(i).getImageReceiver().cancelLoadImage();
+                    imageViews.get(i).avatarImageView.getImageReceiver().cancelLoadImage();
                 }
             }
             objects.clear();
@@ -1327,8 +1440,8 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
         this.roundBottomRadius = bottomRadius;
         if (adapter != null) {
             for (int i = 0; i < adapter.objects.size(); i++) {
-                if (adapter.objects.get(i).imageView != null) {
-                    adapter.objects.get(i).imageView.setRoundRadius(roundTopRadius, roundTopRadius, roundBottomRadius, roundBottomRadius);
+                if (adapter.objects.get(i).avatarWithBlur.avatarImageView != null) {
+                    adapter.objects.get(i).avatarWithBlur.avatarImageView.setRoundRadius(roundTopRadius, roundTopRadius, roundBottomRadius, roundBottomRadius);
                 }
             }
         }
