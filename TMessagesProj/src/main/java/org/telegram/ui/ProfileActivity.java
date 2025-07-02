@@ -1169,10 +1169,12 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 final float progressToGradient = (playProfileAnimation == 0 ? 1f : avatarAnimationProgress) * hasColorAnimated.set(hasColorById);
                 if (progressToGradient < 1) {
                     canvas.drawRect(0, 0, getMeasuredWidth(), y1, paint);
+                    buttonContainer.calculatePaintForTopView(paint);
                 }
                 if (progressToGradient > 0) {
                     backgroundPaint.setAlpha((int) (0xFF * progressToGradient));
                     canvas.drawRect(0, 0, getMeasuredWidth(), y1, backgroundPaint);
+                    buttonContainer.calculatePaintForTopView(backgroundPaint);
                 }
                 if (hasEmoji) {
                     final float loadedScale = emojiLoadedT.set(isEmojiLoaded());
@@ -1755,6 +1757,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     invalidateIndicatorRect(prevPage != realPosition);
                     prevPage = realPosition;
                     updateAvatarItems();
+                    post(() -> {
+                        buttonContainer.calculatePaintForAvatar(position);
+                        buttonContainer.setCorrectColor();
+                    });
                 }
 
                 @Override
@@ -2246,43 +2252,95 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
     class ButtonContainer extends View {
         private int buttonCount = 4;
-        private final Paint paint;
+        private Paint paint;
         private final float spacing = dp(5);
         private final float radius = dp(9);
+        private Paint topViewPaint;
+        private Paint avatarBlurPaint;
+        private int avatarPageNumber = -1;
 
         public ButtonContainer(Context context) {
             super(context);
             paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            paint.setColor(Color.TRANSPARENT);
         }
 
+        public void calculatePaintForAvatar(int page){
+            if (page != avatarPageNumber || avatarBlurPaint == null) {
+                Bitmap blurBit = avatarsViewPager.getCurrentItemBlur();
+                if (blurBit != null) {
+                    int fadedArea = dp(30);
+                    Bitmap croppedBitmap = Bitmap.createBitmap(
+                            blurBit,
+                            0,
+                            fadedArea,
+                            blurBit.getWidth(),
+                            blurBit.getHeight() - fadedArea
+                    );
+                    Bitmap scaled = Bitmap.createScaledBitmap(
+                            croppedBitmap,
+                            getWidth(),
+                            getHeight(),
+                            true
+                    );
 
-        public void calculatePaint() {
-            if (topView.getWidth() > 0) {
-                ColorMatrix colorMatrix = new ColorMatrix();
-                colorMatrix.setSaturation(1.6f);
-                AndroidUtilities.multiplyBrightnessColorMatrix(colorMatrix, true ? .9f : .84f);
-                AndroidUtilities.adjustBrightnessColorMatrix(colorMatrix, true ? -.04f : +.06f);
+                    avatarBlurPaint = calculatePaint(scaled, !isDark(scaled));
+                    avatarPageNumber = page;
+                }
+            }
+        }
 
-                Bitmap bitmap = Bitmap.createBitmap(topView.getWidth(), topView.getHeight(), Bitmap.Config.ARGB_8888);
-                Canvas canvas = new Canvas(bitmap);
-                topView.draw(canvas);
-                paint.setColor(0);
-                paint.setFilterBitmap(true);
-                BitmapShader shader = new BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+        private boolean isDark(Bitmap bitmap) {
+            int color = bitmap.getPixel(bitmap.getWidth() / 2, bitmap.getHeight() / 2);
+            int red = Color.red(color);
+            int green = Color.green(color);
+            int blue = Color.blue(color);
+            double brightness = (0.299 * red + 0.587 * green + 0.114 * blue);
+            return brightness < 128;
+        }
+        public void calculatePaintForTopView(Paint topPaint) {
+            Paint clonedPaint = new Paint(topPaint);
+            ColorMatrix colorMatrix = new ColorMatrix();
+            colorMatrix.setSaturation(1.6f);
+            AndroidUtilities.multiplyBrightnessColorMatrix(colorMatrix, .9f);
+            AndroidUtilities.adjustBrightnessColorMatrix(colorMatrix, -.04f);
+            clonedPaint.setColorFilter(new ColorMatrixColorFilter(colorMatrix));
+            topViewPaint = clonedPaint;
+            setCorrectColor();
+        }
 
-                // Calculate how much to shift the shader so the bottom aligns
-                Matrix matrix = new Matrix();
-                float translateY = dp(156) - bitmap.getHeight();
-                matrix.setTranslate(0, translateY);
-                shader.setLocalMatrix(matrix);
-
-                paint.setShader(shader);
-                paint.setColorFilter(new ColorMatrixColorFilter(colorMatrix));
-                paint.setAlpha(0xff);
+        public void setCorrectColor() {
+            Paint mustBePaint;
+            if (isPulledDown) {
+                // The avatar is big
+                mustBePaint = avatarBlurPaint;
+            }
+            else {
+                // The avatar is small
+                mustBePaint = topViewPaint;
+            }
+            if (paint != mustBePaint && mustBePaint != null) {
+                paint = mustBePaint;
                 invalidate();
             }
-
         }
+
+        public Paint calculatePaint(Bitmap bitmapSrc, boolean light) {
+            ColorMatrix colorMatrix = new ColorMatrix();
+            colorMatrix.setSaturation(1.6f);
+            AndroidUtilities.multiplyBrightnessColorMatrix(colorMatrix, light ? .9f : .84f);
+            AndroidUtilities.adjustBrightnessColorMatrix(colorMatrix, light ? -.04f : +.06f);
+            Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            paint.setColor(0);
+            paint.setFilterBitmap(true);
+            BitmapShader shader = new BitmapShader(bitmapSrc, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+
+            paint.setShader(shader);
+            paint.setColorFilter(new ColorMatrixColorFilter(colorMatrix));
+            paint.setAlpha(0xff);
+            return paint;
+        }
+
         public void setButtonCount(int count) {
             this.buttonCount = Math.max(1, count);
             invalidate();
@@ -5271,7 +5329,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             avatarsViewPager.setChatInfo(chatInfo);
         }
         avatarContainer2.addView(avatarsViewPager);
-        avatarContainer2.addView(buttonContainer, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 56, Gravity.TOP, 10, 0, 10, 0));
+        avatarContainer2.addView(buttonContainer, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 60, Gravity.TOP, 10, 0, 10, 0));
         avatarContainer2.addView(overlaysView);
         avatarImage.setAvatarsViewPager(avatarsViewPager);
 
@@ -7477,8 +7535,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             }
         }
 
-        // TODO: Remove this line and call it once we have the topview ready
-        buttonContainer.calculatePaint();
         if (avatarContainer != null) {
             final float diff = Math.min(1f, extraHeight / AndroidUtilities.dp(200f));
 
@@ -7569,7 +7625,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 //                    + 27 * AndroidUtilities.density * diff
 //                    + actionBar.getTranslationY()
             ;
-            buttonContainerY = extraHeight;
+            buttonContainerY = extraHeight + dp(10);
             buttonContainer.setTranslationY(buttonContainerY);
             float h = openAnimationInProgress ? initialAnimationExtraHeight : extraHeight;
             if (h > AndroidUtilities.dp(200f) || isPulledDown) {
@@ -7634,9 +7690,14 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                                 topView.setBackgroundColor(Color.BLACK);
                                 avatarContainer.setVisibility(View.GONE);
                                 avatarsViewPager.setVisibility(View.VISIBLE);
+                                buttonContainer.post(() -> {
+                                    buttonContainer.calculatePaintForAvatar(2);
+                                    buttonContainer.setCorrectColor();
+                                });
                             }
                         });
                         expandAnimator.start();
+                        buttonContainer.setCorrectColor();
                     }
                     ViewGroup.LayoutParams params = avatarsViewPager.getLayoutParams();
                     params.width = listView.getMeasuredWidth();
@@ -7659,6 +7720,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 } else {
                     if (isPulledDown) {
                         isPulledDown = false;
+                        buttonContainer.setCorrectColor();
                         NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.needCheckSystemBarColors, true);
                         if (otherItem != null) {
                             otherItem.hideSubItem(gallery_menu_save);
@@ -7796,7 +7858,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 // diff is the expand fraction (full expand = 1, full collapse = 0)
 //                avatarScale = (89 - 89 * (1 - diff)) / 89.0f;
                 avatarScale = Math.max(dpf2(30)/ dpf2(89),(89 - 89 * (1 - diff)) / 89.0f);
-                Log.i("mmd","Here is diff" + diff);
                 if (metaBallView != null) {
                     metaBallView.setGooey(
                             avatarY + (avatarContainer.getHeight() / 2),

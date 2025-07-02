@@ -648,6 +648,15 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
         }
     }
 
+    public Bitmap getCurrentItemBlur() {
+        if (adapter != null && !adapter.objects.isEmpty()) {
+            if (adapter.objects.get(getCurrentItem()).avatarWithBlur != null) {
+                return adapter.objects.get(getCurrentItem()).avatarWithBlur.blur;
+            }
+        }
+        return null;
+    }
+
     public boolean isLoadingCurrentVideo() {
         if (videoLocations.get(hasActiveVideo ? getRealPosition() - 1 : getRealPosition()) == null) {
             return false;
@@ -1095,6 +1104,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
     static class ImageWithBlurAtBottom extends FrameLayout {
         final AvatarImageView avatarImageView;
         boolean isBlurAdded = false;
+        Bitmap blur;
         public ImageWithBlurAtBottom(Context context, AvatarImageView avatarImageView) {
             super(context);
             this.avatarImageView = avatarImageView;
@@ -1111,16 +1121,17 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
                         Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL
                 );
                 Bitmap originalImage = avatarImageView.getImageReceiver().getBitmap();
-                Bitmap blurBitmap = Utilities.stackBlurBitmapMax(originalImage);
+                Bitmap bluredBitmap = Utilities.stackBlurBitmapMax(originalImage);
                 // blur the bitmap and get the 3 last dp, it produce almost the same effect as
                 // design, I'll come back later to check if I can implement it in a better way.
-                Drawable drawable = new BitmapDrawable(getResources(), createFadedBottomBitmap(blurBitmap));
+                blur = createFadedBottomBitmap(bluredBitmap);
+                Drawable drawable = new BitmapDrawable(getResources(), blur);
                 blurSpacer.setBackground(drawable);
                 addView(blurSpacer, blurParams);
             }
         }
         public Bitmap createFadedBottomBitmap(Bitmap source) {
-            int totalHeightPx = AndroidUtilities.dp( 100);
+            int totalHeightPx = AndroidUtilities.dp( 70);
             int fadeHeightPx = AndroidUtilities.dp(30);
             int ignoreBottomPx = AndroidUtilities.dp(1);
             int sliceHeightPx = AndroidUtilities.dp(3);
@@ -1169,7 +1180,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
             View blurSpacer = new View(getContext());
             LinearLayout.LayoutParams blurParams = new LinearLayout.LayoutParams(
                     LayoutParams.MATCH_PARENT,
-                    AndroidUtilities.dp(85)
+                    AndroidUtilities.dp(65)
             );
             linearLayout.addView(blurSpacer, blurParams);
             addView(linearLayout);
