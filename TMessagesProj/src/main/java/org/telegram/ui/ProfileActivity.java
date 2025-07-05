@@ -7743,10 +7743,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         if (openAnimationInProgress && playProfileAnimation == 2) {
                             additionalTranslationY = -(1.0f - avatarAnimationProgress) * AndroidUtilities.dp(50);
                         }
-                        onlineX = AndroidUtilities.dpf2(16f) - onlineTextView[1].getLeft();
+                        onlineX = -(((listView.getWidth() -  onlineTextView[1].getTextWidth()) / 2)) + dp(20);
                         nameTextView[1].setTranslationX(-(((listView.getWidth() -  (((nameTextView[1].getTextWidth() + nameTextView[1].getRightDrawable2Width() + nameTextView[1].getRightDrawableWidth()) * nameTextView[1].getScaleX()))) / 2)) + dp(20));
                         nameTextView[1].setTranslationY(newTop + h - AndroidUtilities.dpf2(115f) - nameTextView[1].getBottom() + additionalTranslationY);
-                        onlineTextView[1].setTranslationX(-(((listView.getWidth() -  onlineTextView[1].getTextWidth()) / 2)) + dp(20));
+                        onlineTextView[1].setTranslationX(onlineX);
                         onlineTextView[1].setTranslationY(newTop + h - AndroidUtilities.dpf2(90f) - onlineTextView[1].getBottom() + additionalTranslationY);
                         mediaCounterTextView.setTranslationX(onlineTextView[1].getTranslationX());
                         mediaCounterTextView.setTranslationY(onlineTextView[1].getTranslationY());
@@ -7946,7 +7946,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     );
 
                     onlineX = lerp(
-                            -(((listView.getWidth() -  onlineTextView[a].getTextWidth()) / 2) - dp(54)),
+                            -(((listView.getWidth() -  onlineTextView[a].getTextWidth() - onlineTextView[a].getRightDrawableWidth() - onlineTextView[a].getRightDrawable2Width()) / 2) - dp(54)),
                             0,
                             diff * diff * diff
                     );
