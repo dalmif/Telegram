@@ -543,6 +543,12 @@ public class SimpleTextView extends View implements Drawable.Callback {
         return (int) (drawablePadding + rightDrawable.getIntrinsicWidth() * rightDrawableScale);
     }
 
+    public int getRightDrawable2Width() {
+        if (rightDrawable2 == null)
+            return 0;
+        return (int) (drawablePadding + rightDrawable2.getIntrinsicWidth() * rightDrawableScale);
+    }
+
     public int getTextHeight() {
         return textHeight;
     }
