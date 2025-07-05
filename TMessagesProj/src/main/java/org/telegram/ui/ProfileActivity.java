@@ -6029,7 +6029,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
 
         if (extraHeight > AndroidUtilities.dp(200f) && expandProgress < 0.33f) {
-            refreshNameAndOnlineXY();
+//            refreshNameAndOnlineXY();
         }
 
         if (scamDrawable != null) {
@@ -7687,7 +7687,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             float h = openAnimationInProgress ? initialAnimationExtraHeight : extraHeight;
             if (h > AndroidUtilities.dp(200f) || isPulledDown) {
                 expandProgress = Math.max(0f, Math.min(1f, (h - AndroidUtilities.dp(200f)) / (listView.getMeasuredWidth() - newTop - AndroidUtilities.dp(200f))));
-                avatarScale = AndroidUtilities.lerp((89f + 18f) / 89f, (89f + 10f + 18f) / 89f, Math.min(1f, expandProgress * 3f));
+                avatarScale = AndroidUtilities.lerp((89f) / 89f, (89f + 10f) / 89f, Math.min(1f, expandProgress * 3f));
                 if (storyView != null) {
                     storyView.invalidate();
                 }
@@ -7768,7 +7768,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         int extraTranlsation = onlineTextView[1].getRightDrawable2Width() + onlineTextView[1].getRightDrawableWidth();
                         if (extraTranlsation > 0)
                             extraTranlsation -= dp(8);
-                        onlineX = -(listView.getWidth() -  onlineTextView[1].getTextWidth() + extraTranlsation) / 2 + dp(20);
+                        int onlineX = -(listView.getWidth() -  onlineTextView[1].getTextWidth() + extraTranlsation) / 2 + dp(20);
                         nameTextView[1].setTranslationX(
                                 -((listView.getWidth() - nameTextView[1].getScaleX() * (
                                         nameTextView[1].getTextWidth() +
@@ -7841,7 +7841,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     avatarContainer.setScaleY(avatarScale);
 
                     if (expandAnimator == null || !expandAnimator.isRunning()) {
-                        refreshNameAndOnlineXY();
+//                        refreshNameAndOnlineXY();
                         nameTextView[1].setTranslationX(nameX);
                         nameTextView[1].setTranslationY(nameY);
                         onlineTextView[1].setTranslationX(onlineX + customPhotoOffset);
