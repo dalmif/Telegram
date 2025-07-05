@@ -60,6 +60,7 @@ import android.graphics.PorterDuffXfermode;
 import android.graphics.RadialGradient;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.RenderEffect;
 import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
@@ -2445,73 +2446,101 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             }));
 
             gradientPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                RenderEffect colorFilter = RenderEffect.createColorFilterEffect(
+                        new ColorMatrixColorFilter(
+                                new ColorMatrix(
+                                    new float[] {
+                                            1f, 0f, 0f, 0f, 0f,
+                                            0f, 1f, 0f, 0f, 0f,
+                                            0f, 0f, 1f, 0f, 0f,
+                                            0f, 0f, 0f, 39f, -5000f
+                                    }
+                                )
+                        )
+                );
+                RenderEffect blurEffect = RenderEffect.createBlurEffect(
+                        dp(28),
+                        dp(28),
+                        Shader.TileMode.CLAMP
+                );
+                RenderEffect chainedEffect = RenderEffect.createChainEffect(colorFilter, blurEffect);
+                setRenderEffect(chainedEffect);
+            }
         }
 
         @Override
         protected void onDraw(@NonNull Canvas canvas) {
             super.onDraw(canvas);
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                RectF rectf = new RectF(0f, 0f, getWidth(), getHeight());
+                canvas.save();
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    canvas.saveLayer(
+                            rectf,
+                            gooeyPaint
+                    );
+                } else {
+                    canvas.saveLayer(
+                            rectf,
+                            gooeyPaint,
+                            Canvas.ALL_SAVE_FLAG
+                    );
+                }
 
-            RectF rectf = new RectF(0f ,0f,getWidth(),getHeight());
-            canvas.save();
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                canvas.saveLayer(
-                        rectf,
-                        gooeyPaint
+                float centerX1 = getWidth() / 2f;
+                float centerY1 = -200f;
+
+                float centerX2 = getWidth() / 2f;
+                float centerY2 = gooeyYCenter;
+
+                float outerRadius = Math.max(radius * (4.5f * (1 - Math.max(0.5f, fraction))), 1f);
+
+                RadialGradient gradient1 = new RadialGradient(
+                        centerX1, centerY1, 200 + 50,
+                        new int[]{Color.BLACK, Color.TRANSPARENT},
+                        new float[]{0f, 1f},
+                        Shader.TileMode.CLAMP
                 );
+                gradientPaint.setShader(gradient1);
+                canvas.drawCircle(centerX1, centerY1, 200 + 50, gradientPaint);
+
+                RadialGradient gradient2 = new RadialGradient(
+                        centerX2, centerY2, outerRadius,
+                        new int[]{Color.BLACK, Color.TRANSPARENT,},
+                        new float[]{0f, 1f},
+                        Shader.TileMode.CLAMP
+                );
+                gradientPaint.setShader(gradient2);
+                canvas.drawCircle(centerX2, centerY2, outerRadius, gradientPaint);
+
+
+                canvas.drawCircle(getWidth() / 2f, -200, 200f, paint);
+                canvas.drawCircle(getWidth() / 2f, gooeyYCenter, radius, paint);
+
+                canvas.restore();
+
+                Bitmap bitmap = Bitmap.createBitmap(dp(89), dp(89), Bitmap.Config.ARGB_8888);
+                Canvas canvas1 = new Canvas(bitmap);
+
+                avatarImage.draw(canvas1);
+
+                Utilities.stackBlurBitmap(bitmap, (int) (10 + (30 * (1 - fraction))));
+                paint.setAlpha((int) (255f * fraction * fraction * fraction));
+                canvas.drawBitmap(createCircleBitmap(bitmap), null,
+                        new RectF((getWidth() / 2f) - radius, gooeyYCenter - radius,
+                                (getWidth() / 2f) + radius,
+                                gooeyYCenter + radius
+                        ),
+                        paint);
             }
             else {
-                canvas.saveLayer(
-                        rectf,
-                        gooeyPaint,
-                        Canvas.ALL_SAVE_FLAG
-                );
+                // Android 12+
+                canvas.drawCircle(getWidth() / 2f, -dp(96), dp(100), paint);
+                canvas.drawCircle(getWidth() / 2f, gooeyYCenter, radius, paint);
             }
-
-            float centerX1 = getWidth() / 2f;
-            float centerY1 = -200f;
-
-            float centerX2 = getWidth() / 2f;
-            float centerY2 = gooeyYCenter;
-
-            float outerRadius = Math.max(radius * (4.5f * (1 - Math.max(0.5f, fraction))), 1f);
-
-            RadialGradient gradient1 = new RadialGradient(
-                    centerX1, centerY1, 200 + 50,
-                    new int[]{Color.BLACK, Color.TRANSPARENT},
-                    new float[]{0f, 1f},
-                    Shader.TileMode.CLAMP
-            );
-            gradientPaint.setShader(gradient1);
-            canvas.drawCircle(centerX1, centerY1, 200 + 50, gradientPaint);
-
-            RadialGradient gradient2 = new RadialGradient(
-                    centerX2, centerY2, outerRadius,
-                    new int[]{Color.BLACK, Color.TRANSPARENT,},
-                    new float[]{0f, 1f},
-                    Shader.TileMode.CLAMP
-            );
-            gradientPaint.setShader(gradient2);
-            canvas.drawCircle(centerX2, centerY2, outerRadius, gradientPaint);
-
-
-            canvas.drawCircle(getWidth() / 2f, -200, 200f, paint);
-            canvas.drawCircle(getWidth() / 2f, gooeyYCenter, radius, paint);
-
-            canvas.restore();
-
-            Bitmap bitmap = Bitmap.createBitmap(dp(89), dp(89), Bitmap.Config.ARGB_8888);
-            Canvas canvas1 = new Canvas(bitmap);
-
-            avatarImage.draw(canvas1);
-
-            Utilities.stackBlurBitmap(bitmap, (int) ( 10 + (30 * (1-fraction))));
-            paint.setAlpha((int) (255f * fraction * fraction * fraction));
-            canvas.drawBitmap(createCircleBitmap(bitmap), null,
-                    new RectF((getWidth() / 2f) - radius, gooeyYCenter - radius,
-                            (getWidth() / 2f) + radius,
-                          gooeyYCenter + radius
-                    ),
-                    paint);
         }
 
         public void setGooey(float yCenter, float radius, float fraction) {
@@ -7933,11 +7962,13 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
                 // diff is the expand fraction (full expand = 1, full collapse = 0)
 //                avatarScale = (89 - 89 * (1 - diff)) / 89.0f;
-                avatarScale = Math.max(dpf2(30)/ dpf2(89),(89 - 89 * (1 - diff)) / 89.0f);
+                float extremeDiff;
+                extremeDiff = (float) (1 - Math.pow(1 - diff, 2));
+                avatarScale = extremeDiff;
                 if (metaBallView != null) {
                     metaBallView.setGooey(
                             avatarY + (avatarContainer.getHeight() / 2),
-                            (avatarContainer.getHeight() * avatarContainer.getScaleY()) / 2,
+                            (avatarContainer.getWidth() * avatarScale) / 2,
                             diff
                     );
                     metaBallView.invalidate();
