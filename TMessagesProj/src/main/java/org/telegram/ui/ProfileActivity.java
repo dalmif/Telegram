@@ -5987,11 +5987,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         avatarContainer.setScaleX(avatarScale);
         avatarContainer.setScaleY(avatarScale);
         avatarContainer.setTranslationX(AndroidUtilities.lerp(avatarX, 0f, value));
-        final float totalAvailableHeightForAvatar = extraHeight + newTop;
+        final float totalAvailableHeightForAvatar = extraHeight + newTop - dp(65);
         // The avatarContainer is scaled, so we adjust its height to ensure it fits within bounds
         final float heightOfAvatarContainer = totalAvailableHeightForAvatar / avatarScale;
         avatarContainer.setTranslationY(
-                AndroidUtilities.lerp((float) Math.ceil(avatarY), (totalAvailableHeightForAvatar - heightOfAvatarContainer) / 2, value)
+                AndroidUtilities.lerp((float) Math.ceil(avatarY), ((totalAvailableHeightForAvatar - heightOfAvatarContainer) / 2) , value)
         );
         avatarImage.setRoundRadius((int) AndroidUtilities.lerp(getSmallAvatarRoundRadius(), 0f, value));
         if (storyView != null) {
@@ -6044,19 +6044,27 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
         final float k = AndroidUtilities.dpf2(8f);
 
-        final float nameTextViewXEnd = AndroidUtilities.dpf2(18f) - nameTextView[1].getLeft();
-        final float nameTextViewYEnd = newTop + extraHeight - AndroidUtilities.dpf2(38f) - nameTextView[1].getBottom();
+        final float nameTextViewXEnd = -((listView.getWidth() - nameTextView[1].getScaleX() * (
+                nameTextView[1].getTextWidth() +
+                        nameTextView[1].getRightDrawable2Width() +
+                        nameTextView[1].getRightDrawableWidth()
+        )) / 2) + dp(20);
+
+        final float nameTextViewYEnd = newTop + extraHeight - AndroidUtilities.dpf2(105f) - nameTextView[1].getBottom();
         final float nameTextViewCx = k + nameX + (nameTextViewXEnd - nameX) / 2f;
         final float nameTextViewCy = k + nameY + (nameTextViewYEnd - nameY) / 2f;
         final float nameTextViewX = (1 - value) * (1 - value) * nameX + 2 * (1 - value) * value * nameTextViewCx + value * value * nameTextViewXEnd;
         final float nameTextViewY = (1 - value) * (1 - value) * nameY + 2 * (1 - value) * value * nameTextViewCy + value * value * nameTextViewYEnd;
 
-        final float onlineTextViewXEnd = AndroidUtilities.dpf2(16f) - onlineTextView[1].getLeft();
-        final float onlineTextViewYEnd = newTop + extraHeight - AndroidUtilities.dpf2(18f) - onlineTextView[1].getBottom();
+        int extraTranlsationXOnlineTV = onlineTextView[1].getRightDrawable2Width() + onlineTextView[1].getRightDrawableWidth();
+        if (extraTranlsationXOnlineTV > 0)
+            extraTranlsationXOnlineTV -= dp(8);
+        final float onlineTextViewXEnd = -(listView.getWidth() -  onlineTextView[1].getTextWidth() + extraTranlsationXOnlineTV) / 2 + dp(20);
+        final float onlineTextViewYEnd = newTop + extraHeight - AndroidUtilities.dpf2(85f) - onlineTextView[1].getBottom();
         final float onlineTextViewCx = k + onlineX + (onlineTextViewXEnd - onlineX) / 2f;
         final float onlineTextViewCy = k + onlineY + (onlineTextViewYEnd - onlineY) / 2f;
         final float onlineTextViewX = (1 - value) * (1 - value) * onlineX + 2 * (1 - value) * value * onlineTextViewCx + value * value * onlineTextViewXEnd;
-        final float onlineTextViewY = (1 - value) * (1 - value) * onlineY + 2 * (1 - value) * value * onlineTextViewCy + value * value * onlineTextViewYEnd;
+        final float onlineTextViewY = ((1 - value) * (1 - value) * onlineY) + (2 * (1 - value) * value * onlineTextViewCy) + (value * value * onlineTextViewYEnd);
 
         nameTextView[1].setTranslationX(nameTextViewX);
         nameTextView[1].setTranslationY(nameTextViewY);
@@ -7743,11 +7751,20 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         if (openAnimationInProgress && playProfileAnimation == 2) {
                             additionalTranslationY = -(1.0f - avatarAnimationProgress) * AndroidUtilities.dp(50);
                         }
-                        onlineX = -(((listView.getWidth() -  onlineTextView[1].getTextWidth()) / 2)) + dp(20);
-                        nameTextView[1].setTranslationX(-(((listView.getWidth() -  (((nameTextView[1].getTextWidth() + nameTextView[1].getRightDrawable2Width() + nameTextView[1].getRightDrawableWidth()) * nameTextView[1].getScaleX()))) / 2)) + dp(20));
-                        nameTextView[1].setTranslationY(newTop + h - AndroidUtilities.dpf2(115f) - nameTextView[1].getBottom() + additionalTranslationY);
+                        int extraTranlsation = onlineTextView[1].getRightDrawable2Width() + onlineTextView[1].getRightDrawableWidth();
+                        if (extraTranlsation > 0)
+                            extraTranlsation -= dp(8);
+                        onlineX = -(listView.getWidth() -  onlineTextView[1].getTextWidth() + extraTranlsation) / 2 + dp(20);
+                        nameTextView[1].setTranslationX(
+                                -((listView.getWidth() - nameTextView[1].getScaleX() * (
+                                        nameTextView[1].getTextWidth() +
+                                                nameTextView[1].getRightDrawable2Width() +
+                                                nameTextView[1].getRightDrawableWidth()
+                                )) / 2) + dp(20)
+                        );
+                        nameTextView[1].setTranslationY(newTop + h - AndroidUtilities.dpf2(105f) - nameTextView[1].getBottom() + additionalTranslationY);
                         onlineTextView[1].setTranslationX(onlineX);
-                        onlineTextView[1].setTranslationY(newTop + h - AndroidUtilities.dpf2(90f) - onlineTextView[1].getBottom() + additionalTranslationY);
+                        onlineTextView[1].setTranslationY(newTop + h - AndroidUtilities.dpf2(85f) - onlineTextView[1].getBottom() + additionalTranslationY);
                         mediaCounterTextView.setTranslationX(onlineTextView[1].getTranslationX());
                         mediaCounterTextView.setTranslationY(onlineTextView[1].getTranslationY());
                         updateCollectibleHint();
@@ -7945,8 +7962,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                             ((float) Math.floor(avatarY) + AndroidUtilities.dp(1.3f) + AndroidUtilities.dp(7) * diff + titleAnimationsYDiff * (1f - avatarAnimationProgress)) + dp(88)
                     );
 
+                    int extraTranlsation = onlineTextView[1].getRightDrawable2Width() + onlineTextView[1].getRightDrawableWidth();
+                    if (extraTranlsation > 0)
+                        extraTranlsation -= dp(8);
                     onlineX = lerp(
-                            -(((listView.getWidth() -  onlineTextView[a].getTextWidth() - onlineTextView[a].getRightDrawableWidth() - onlineTextView[a].getRightDrawable2Width()) / 2) - dp(54)),
+                            -(((listView.getWidth() -  onlineTextView[a].getTextWidth() + extraTranlsation) / 2) - dp(54)),
                             0,
                             diff * diff * diff
                     );
@@ -8099,7 +8119,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         if (searchItem != null) {
             extra += 48;
         }
-        // UNCOMMENT LATER
+        // UNCOMMENT LATER: It cause the glassy badge couldn't poit to name
 //        int buttonsWidth = AndroidUtilities.dp(118 + 8 + (40 + extra * (1.0f - mediaHeaderAnimationProgress)));
 //        int minWidth = viewWidth - buttonsWidth;
 //
