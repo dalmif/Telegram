@@ -2267,6 +2267,19 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             paint.setColor(Color.TRANSPARENT);
             addButtons();
         }
+        private float collapseProgress;
+
+        void setCollapseProgress(float progress) {
+            this.collapseProgress = progress;
+            for (int i = 0; i < getChildCount(); i++ ) {
+                getChildAt(i).setPivotX(getChildAt(i).getWidth() / 2);
+                getChildAt(i).setPivotY(0);
+                getChildAt(i).setAlpha(progress * progress * progress * progress);
+                getChildAt(i).setScaleX(progress);
+                getChildAt(i).setScaleY(progress);
+            }
+            invalidate();
+        }
 
         private void addButtons() {
             String[] titles = new String[] {"Message", "Unmute", "Call", "Video"};
@@ -2392,7 +2405,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
             float totalSpacing = spacing * (buttonCount - 1);
             float buttonWidth = (width - totalSpacing) / buttonCount;
-            float buttonHeight = height;
+            float buttonHeight = height * collapseProgress;
 
             float top = getPaddingTop();
             float bottom = top + buttonHeight;
@@ -2401,6 +2414,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 float left = getPaddingLeft() + i * (buttonWidth + spacing);
                 float right = left + buttonWidth;
                 RectF rect = new RectF(left, top, right, bottom);
+                paint.setAlpha((int) (255 * collapseProgress * collapseProgress));
                 canvas.drawRoundRect(rect, radius, radius, paint);
             }
             super.onDraw(canvas);
@@ -7668,7 +7682,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 //                    + 27 * AndroidUtilities.density * diff
 //                    + actionBar.getTranslationY()
             ;
-            buttonContainerY = extraHeight + dp(10);
+            buttonContainerY = Math.max(extraHeight + dp(10), dp(80));
             buttonContainer.setTranslationY(buttonContainerY);
             float h = openAnimationInProgress ? initialAnimationExtraHeight : extraHeight;
             if (h > AndroidUtilities.dp(200f) || isPulledDown) {
@@ -7948,6 +7962,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 if (showStatusButton != null) {
                     showStatusButton.setAlpha((int) (0xFF * diff));
                 }
+                buttonContainer.setCollapseProgress(Math.min(1, (extraHeight) / (dp(56) + dp(10))));
                 for (int a = 0; a < nameTextView.length; a++) {
                     if (nameTextView[a] == null) {
                         continue;
@@ -7959,7 +7974,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     );
                     nameY = Math.max(
                             (actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0f) + dpf2(10) ,
-                            ((float) Math.floor(avatarY) + AndroidUtilities.dp(1.3f) + AndroidUtilities.dp(7) * diff + titleAnimationsYDiff * (1f - avatarAnimationProgress)) + dp(88)
+                            ((float) Math.floor(avatarY) + AndroidUtilities.dp(1.3f) + dp(7) - AndroidUtilities.dp(30) * (1 - diff) + titleAnimationsYDiff * (1f - avatarAnimationProgress)) + dp(88)
                     );
 
                     int extraTranlsation = onlineTextView[1].getRightDrawable2Width() + onlineTextView[1].getRightDrawableWidth();
@@ -7972,7 +7987,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     );
                     onlineY =  Math.max(
                             (actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0f) + dpf2(30),
-                            ((float) Math.floor(avatarY) + AndroidUtilities.dp(24) + (float) Math.floor(11 * AndroidUtilities.density) * diff) + dp(88)
+                            ((float) Math.floor(avatarY) + AndroidUtilities.dp(24) - AndroidUtilities.dp(30) * (1 - diff) +  (float) Math.floor(11 * AndroidUtilities.density) * diff) + dp(88)
                             );
 
 
