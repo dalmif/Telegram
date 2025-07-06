@@ -2428,10 +2428,14 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         private Paint paint;
         private Paint gooeyPaint;
         private float fraction;
-
+        private RenderEffect colorFilterEffect;
         private Paint gradientPaint;
         private final float gradientRadiusOffset = dp(36);
+        private float blurredImageAlpha;
+        private float blurFraction;
+        private boolean useRenderEffect;
 
+        @SuppressLint("NewApi")
         public MetaBallView(Context context) {
             super(context);
             paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -2446,10 +2450,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             }));
 
             gradientPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            useRenderEffect = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
+//            useRenderEffect = false;
 
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                RenderEffect colorFilter = RenderEffect.createColorFilterEffect(
+            if (useRenderEffect) {
+                colorFilterEffect = RenderEffect.createColorFilterEffect(
                         new ColorMatrixColorFilter(
                                 new ColorMatrix(
                                     new float[] {
@@ -2461,20 +2466,13 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                                 )
                         )
                 );
-                RenderEffect blurEffect = RenderEffect.createBlurEffect(
-                        dp(28),
-                        dp(28),
-                        Shader.TileMode.CLAMP
-                );
-                RenderEffect chainedEffect = RenderEffect.createChainEffect(colorFilter, blurEffect);
-                setRenderEffect(chainedEffect);
             }
         }
 
         @Override
         protected void onDraw(@NonNull Canvas canvas) {
             super.onDraw(canvas);
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            if (!useRenderEffect) {
                 RectF rectf = new RectF(0f, 0f, getWidth(), getHeight());
                 canvas.save();
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -2527,26 +2525,56 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
                 avatarImage.draw(canvas1);
 
-                Utilities.stackBlurBitmap(bitmap, (int) (10 + (30 * (1 - fraction))));
-                paint.setAlpha((int) (255f * fraction * fraction * fraction));
+                Utilities.stackBlurBitmap(bitmap, (int) (dpf2(34) * blurFraction));
+                Paint bitmapPaint = new Paint(paint);
+                bitmapPaint.setAlpha((int) (255f * blurredImageAlpha));
                 canvas.drawBitmap(createCircleBitmap(bitmap), null,
                         new RectF((getWidth() / 2f) - radius, gooeyYCenter - radius,
                                 (getWidth() / 2f) + radius,
                                 gooeyYCenter + radius
                         ),
-                        paint);
+                        bitmapPaint);
             }
             else {
-                // Android 12+
-                canvas.drawCircle(getWidth() / 2f, -dp(96), dp(100), paint);
+//                canvas.drawCircle(getWidth() / 2f, -dp(98), dp(100), paint);
+                canvas.drawRect(0,-dp(98), getWidth(), dp(6), paint);
                 canvas.drawCircle(getWidth() / 2f, gooeyYCenter, radius, paint);
+                Bitmap bitmap = Bitmap.createBitmap(dp(89), dp(89), Bitmap.Config.ARGB_8888);
+                Canvas canvas1 = new Canvas(bitmap);
+                avatarImage.draw(canvas1);
+                Paint bitmapPaint = new Paint(paint);
+                bitmapPaint.setAlpha((int) (255f * blurredImageAlpha));
+                canvas.drawBitmap(createCircleBitmap(bitmap), null,
+                        new RectF((getWidth() / 2f) - radius, gooeyYCenter - radius,
+                                (getWidth() / 2f) + radius,
+                                gooeyYCenter + radius
+                        ),
+                        bitmapPaint);
             }
         }
 
-        public void setGooey(float yCenter, float radius, float fraction) {
+        @SuppressLint("NewApi")
+        public void setGooey(float yCenter, float radius, float fraction, float blurFraction) {
             this.gooeyYCenter = yCenter;
             this.radius = radius;
             this.fraction = fraction;
+            this.blurFraction = blurFraction;
+            this.blurredImageAlpha = 1 - blurFraction;
+            if (useRenderEffect) {
+                if (blurFraction > 0) {
+                    RenderEffect blurEffect = RenderEffect.createBlurEffect(
+                            dp(40) * blurFraction,
+                            dp(40) * blurFraction,
+                            Shader.TileMode.CLAMP
+                    );
+                RenderEffect chainedEffect = RenderEffect.createChainEffect(colorFilterEffect, blurEffect);
+                setRenderEffect(chainedEffect);
+                }
+                else {
+                    setRenderEffect(null);
+                }
+            }
+
         }
 
         private Bitmap createCircleBitmap(Bitmap bitmap) {
@@ -5301,7 +5329,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
             }
         };
-        avatarImage.setBlurAllowed(true);
         avatarImage.getImageReceiver().setAllowDecodeSingleFrame(true);
         avatarImage.setRoundRadius(getSmallAvatarRoundRadius());
         avatarImage.setPivotX(0);
@@ -7959,24 +7986,24 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
             else if (extraHeight <= AndroidUtilities.dp(200f)) {
                 // The toolbar is collapsing here
-
-                // diff is the expand fraction (full expand = 1, full collapse = 0)
-//                avatarScale = (89 - 89 * (1 - diff)) / 89.0f;
-                float extremeDiff;
-                extremeDiff = (float) (1 - Math.pow(1 - diff, 2));
-                avatarScale = extremeDiff;
+                float customDiff = Math.max(0, extraHeight - dp(66)) / dp(200 - 66);
+                float minimum = dpf2(50f) / dpf2(89f);
+                float firstPart = 0.5f * customDiff + 0.5f;
+                float secondPart = -((0.5f * customDiff - 1) * (0.5f * customDiff - 1)) + 1.3044444f;
+                float scale = Math.min(firstPart,secondPart);
+                avatarOpacity = firstPart <= secondPart ? 1f : 0f;
+                avatarScale = Math.max(minimum,scale);
                 if (metaBallView != null) {
+                    int avatarWidth = Math.min(dp(89), avatarContainer.getWidth());
                     metaBallView.setGooey(
                             avatarY + (avatarContainer.getHeight() / 2),
-                            (avatarContainer.getWidth() * avatarScale) / 2,
-                            diff
+                            (avatarWidth * avatarScale) / 2,
+                            diff,
+                            firstPart < secondPart ? 0f : -((2f * (1 - customDiff) - 2) * (2f * (1 - customDiff) - 2)) + 1
                     );
                     metaBallView.invalidate();
                 }
-                avatarImage.setHasBlur(true);
-                avatarImage.onNewImageSet();
-
-                avatarOpacity = (float) Math.exp(-10 * (1.0 - diff));
+                avatarImage.setAlpha(avatarOpacity);
                 if (storyView != null) {
                     storyView.invalidate();
                 }
@@ -7991,7 +8018,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     avatarContainer.setScaleY(avatarScale);
                     avatarContainer.setTranslationX(avatarX);
                     avatarContainer.setTranslationY((float) Math.ceil(avatarY));
-                    avatarImage.setAlpha(avatarOpacity);
                     float extra = AndroidUtilities.dp(89) * avatarScale - AndroidUtilities.dp(89);
                     timeItem.setTranslationX(avatarContainer.getX() + AndroidUtilities.dp(16) + extra);
                     timeItem.setTranslationY(avatarContainer.getY() + AndroidUtilities.dp(15) + extra);

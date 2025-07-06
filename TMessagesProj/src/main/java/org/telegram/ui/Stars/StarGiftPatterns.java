@@ -193,14 +193,17 @@ public class StarGiftPatterns {
                 float y = (float) (targetY + localRadius * Math.sin(angleRadians));
                 float size = 20 * t;
 
-                pattern.setBounds(
-                        (int) (x - dpf2(size) / 2.0f),
-                        (int) (y - dpf2(size) / 2.0f),
-                        (int) (x + dpf2(size) / 2.0f),
-                        (int) (y + dpf2(size) / 2.0f)
-                );
-                pattern.setAlpha((int) (0xFF * thisAlpha));
-                pattern.draw(canvas);
+                if (size > 6.0) {
+                    pattern.setBounds(
+                            (int) (x - dpf2(size) / 2.0f),
+                            (int) (y - dpf2(size) / 2.0f),
+                            (int) (x + dpf2(size) / 2.0f),
+                            (int) (y + dpf2(size) / 2.0f)
+                    );
+
+                    pattern.setAlpha((int) (0xFF * thisAlpha));
+                    pattern.draw(canvas);
+                }
             }
         }
 
