@@ -1170,12 +1170,12 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 final float progressToGradient = (playProfileAnimation == 0 ? 1f : avatarAnimationProgress) * hasColorAnimated.set(hasColorById);
                 if (progressToGradient < 1) {
                     canvas.drawRect(0, 0, getMeasuredWidth(), y1, paint);
-                    buttonContainer.calculatePaintForTopView(paint);
+                    buttonContainer.calculatePaintForTopView(paint, paint.getColor());
                 }
                 if (progressToGradient > 0) {
                     backgroundPaint.setAlpha((int) (0xFF * progressToGradient));
                     canvas.drawRect(0, 0, getMeasuredWidth(), y1, backgroundPaint);
-                    buttonContainer.calculatePaintForTopView(backgroundPaint);
+                    buttonContainer.calculatePaintForTopView(backgroundPaint, this.color1);
                 }
                 if (hasEmoji) {
                     final float loadedScale = emojiLoadedT.set(isEmojiLoaded());
@@ -2343,18 +2343,23 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
         private boolean isDark(Bitmap bitmap) {
             int color = bitmap.getPixel(bitmap.getWidth() / 2, bitmap.getHeight() / 2);
+            return isDarkColor(color);
+        }
+        private boolean isDarkColor(int color) {
             int red = Color.red(color);
             int green = Color.green(color);
             int blue = Color.blue(color);
             double brightness = (0.299 * red + 0.587 * green + 0.114 * blue);
             return brightness < 128;
         }
-        public void calculatePaintForTopView(Paint topPaint) {
+
+        public void calculatePaintForTopView(Paint topPaint, int mainColor) {
             Paint clonedPaint = new Paint(topPaint);
             ColorMatrix colorMatrix = new ColorMatrix();
             colorMatrix.setSaturation(1.6f);
-            AndroidUtilities.multiplyBrightnessColorMatrix(colorMatrix, .9f);
-            AndroidUtilities.adjustBrightnessColorMatrix(colorMatrix, -.04f);
+            boolean light = !isDarkColor(mainColor);
+            AndroidUtilities.multiplyBrightnessColorMatrix(colorMatrix, light ? .9f : .84f);
+            AndroidUtilities.adjustBrightnessColorMatrix(colorMatrix, light ? -.04f : +.06f);
             clonedPaint.setColorFilter(new ColorMatrixColorFilter(colorMatrix));
             topViewPaint = clonedPaint;
             setCorrectColor();
