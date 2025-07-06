@@ -2367,7 +2367,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
         public void setCorrectColor() {
             Paint mustBePaint;
-            if (isPulledDown) {
+            if (isPulledDown && !expandAnimator.isRunning()) {
                 // The avatar is big
                 mustBePaint = avatarBlurPaint;
             }
@@ -2542,7 +2542,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             }
             else {
 //                canvas.drawCircle(getWidth() / 2f, -dp(98), dp(100), paint);
-                canvas.drawRect(0,-dp(98), getWidth(), dp(6), paint);
+                canvas.drawRect(0,-dp(98), getWidth(), dp(4), paint);
                 canvas.drawCircle(getWidth() / 2f, gooeyYCenter, radius, paint);
                 Bitmap bitmap = Bitmap.createBitmap(dp(89), dp(89), Bitmap.Config.ARGB_8888);
                 Canvas canvas1 = new Canvas(bitmap);
