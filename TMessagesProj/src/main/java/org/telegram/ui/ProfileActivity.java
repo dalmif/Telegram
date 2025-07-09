@@ -2688,6 +2688,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         private float blurredImageAlpha;
         private float blurFraction;
         private boolean useRenderEffect;
+        private boolean isAvatarVisible = true;
 
         @SuppressLint("NewApi")
         public MetaBallView(Context context) {
@@ -2790,23 +2791,27 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         bitmapPaint);
             }
             else {
-//                canvas.drawCircle(getWidth() / 2f, -dp(98), dp(100), paint);
                 canvas.drawRect(0,-dp(98), getWidth(), dp(4), paint);
-                canvas.drawCircle(getWidth() / 2f, gooeyYCenter, radius, paint);
-                Bitmap bitmap = Bitmap.createBitmap(dp(89), dp(89), Bitmap.Config.ARGB_8888);
-                Canvas canvas1 = new Canvas(bitmap);
-                avatarImage.draw(canvas1);
-                Paint bitmapPaint = new Paint(paint);
-                bitmapPaint.setAlpha((int) (255f * blurredImageAlpha));
-                canvas.drawBitmap(createCircleBitmap(bitmap), null,
-                        new RectF((getWidth() / 2f) - radius, gooeyYCenter - radius,
-                                (getWidth() / 2f) + radius,
-                                gooeyYCenter + radius
-                        ),
-                        bitmapPaint);
+                if (isAvatarVisible) {
+                    canvas.drawCircle(getWidth() / 2f, gooeyYCenter, radius, paint);
+                    Bitmap bitmap = Bitmap.createBitmap(dp(89), dp(89), Bitmap.Config.ARGB_8888);
+                    Canvas canvas1 = new Canvas(bitmap);
+                    avatarImage.draw(canvas1);
+                    Paint bitmapPaint = new Paint(paint);
+                    bitmapPaint.setAlpha((int) (255f * blurredImageAlpha));
+                    canvas.drawBitmap(createCircleBitmap(bitmap), null,
+                            new RectF((getWidth() / 2f) - radius, gooeyYCenter - radius,
+                                    (getWidth() / 2f) + radius,
+                                    gooeyYCenter + radius
+                            ),
+                            bitmapPaint);
+                }
             }
         }
 
+        public void setAvatarVisibility(boolean visible) {
+            isAvatarVisible = visible;
+        }
         @SuppressLint("NewApi")
         public void setGooey(float yCenter, float radius, float fraction, float blurFraction) {
             this.gooeyYCenter = yCenter;
@@ -8274,14 +8279,21 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 avatarOpacity = firstPart <= secondPart ? 1f : 0f;
                 avatarScale = Math.max(minimum,scale);
                 if (metaBallView != null) {
-                    int avatarWidth = Math.min(dp(89), avatarContainer.getWidth());
-                    metaBallView.setGooey(
-                            avatarY + (avatarContainer.getHeight() / 2),
-                            (avatarWidth * avatarScale) / 2,
-                            diff,
-                            firstPart < secondPart ? 0f : -((2f * (1 - customDiff) - 2) * (2f * (1 - customDiff) - 2)) + 1
-                    );
-                    metaBallView.invalidate();
+                    if (expandAnimator == null || !expandAnimator.isRunning()) {
+                        metaBallView.setAvatarVisibility(true);
+                        int avatarWidth = Math.min(dp(89) - dp(4), avatarContainer.getWidth());
+                        metaBallView.setGooey(
+                                avatarY + (avatarContainer.getHeight() / 2),
+                                (avatarWidth * avatarScale) / 2,
+                                diff,
+                                firstPart < secondPart ? 0f : -((2f * (1 - customDiff) - 2) * (2f * (1 - customDiff) - 2)) + 1
+                        );
+                        metaBallView.invalidate();
+                    }
+                    else {
+                        metaBallView.setAvatarVisibility(false);
+                        metaBallView.invalidate();
+                    }
                 }
                 avatarImage.setAlpha(avatarOpacity);
                 if (storyView != null) {
