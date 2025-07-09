@@ -47,8 +47,6 @@ import android.graphics.Color;
 import android.graphics.ColorFilter;
 import android.graphics.ColorMatrix;
 import android.graphics.ColorMatrixColorFilter;
-import android.graphics.LinearGradient;
-import android.graphics.Matrix;
 import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.Path;
@@ -83,7 +81,6 @@ import android.text.style.ClickableSpan;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.URLSpan;
 import android.text.util.Linkify;
-import android.util.Log;
 import android.util.Property;
 import android.util.SparseArray;
 import android.util.SparseIntArray;
@@ -268,7 +265,6 @@ import org.telegram.ui.Components.ShareAlert;
 import org.telegram.ui.Components.SharedMediaLayout;
 import org.telegram.ui.Components.SizeNotifierFrameLayout;
 import org.telegram.ui.Components.StickerEmptyView;
-import org.telegram.ui.Components.Text;
 import org.telegram.ui.Components.TimerDrawable;
 import org.telegram.ui.Components.TranslateAlert2;
 import org.telegram.ui.Components.TypefaceSpan;
@@ -2252,7 +2248,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     }
 
     class ButtonContainer extends LinearLayout {
-        private int buttonCount = 4;
         private Paint paint;
         private final float spacing = dp(5);
         private final float radius = dp(9);
@@ -2266,7 +2261,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             setOrientation(LinearLayout.HORIZONTAL);
             paint = new Paint(Paint.ANTI_ALIAS_FLAG);
             paint.setColor(Color.TRANSPARENT);
-            addButtons();
+
+            updateButtons();
         }
         private float collapseProgress;
 
@@ -2282,7 +2278,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             invalidate();
         }
 
-        private void addButtons() {
+        void updateButtons() {
+            if (getChildCount() > 0) {
+                removeAllViews();
+            }
             if (userId != 0) {
                 TLRPC.User user = getMessagesController().getUser(userId);
                 if (user == null) {
@@ -2373,12 +2372,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     }
                 }
                 else {
+                    // GROUPS
                     addMessageButton();
                     addMuteButton();
-                    if (chatInfo != null) {
-                        if (ChatObject.canManageCalls(chat) && chatInfo.call == null) {
-                            addVoiceChatButton();
-                        }
+                    if (chatInfo != null && ChatObject.canManageCalls(chat) && chatInfo.call == null) {
+                        addVoiceChatButton();
                     }
                     if (!chat.creator && !chat.left && !chat.kicked && !isTopic) {
                         addLeaveButton();
@@ -2389,7 +2387,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
            for (int i = 1; i < getChildCount(); i++) {
                LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) getChildAt(i).getLayoutParams();
                params.setMarginStart((int) spacing);
+               getChildAt(i).setLayoutParams(params);
            }
+           setCorrectColor();
+           invalidate();
         }
 
         private void addMessageButton() {
@@ -2400,52 +2401,114 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
 
         private void addMuteButton() {
-            View btn = createButton(R.drawable.ic_profile_unmute, R.string.Unmute,(view) -> {});
+
+            SharedPreferences preferences = MessagesController.getNotificationsSettings(currentAccount);
+            long did;
+            if (dialogId != 0) {
+                did = dialogId;
+            } else if (userId != 0) {
+                did = userId;
+            } else {
+                did = -chatId;
+            }
+            String key = NotificationsController.getSharedPrefKey(did, topicId);
+            boolean unmuted = false;
+            boolean hasOverride = preferences.contains("notify2_" + key);
+            int value = preferences.getInt("notify2_" + key, 0);
+            int delta = preferences.getInt("notifyuntil_" + key, 0);
+            if (value == 3 && delta != Integer.MAX_VALUE) {
+                unmuted = delta - getConnectionsManager().getCurrentTime() <= 0;
+            } else {
+                if (value == 0) {
+                    if (hasOverride) {
+                        unmuted = true;
+                    } else {
+                        unmuted = getNotificationsController().isGlobalNotificationsEnabled(did, false, false);
+                    }
+                } else if (value == 1) {
+                    unmuted = true;
+                }
+            }
+            View btn = createButton(unmuted ? R.drawable.ic_profile_mute : R.drawable.ic_profile_unmute, unmuted ? R.string.Mute : R.string.Unmute,(v) -> {
+                ChatNotificationsPopupWrapper chatNotificationsPopupWrapper = createChatNotificationsPopupWrapper(did);
+                chatNotificationsPopupWrapper.update(did, topicId, notificationsExceptionTopics);
+                chatNotificationsPopupWrapper.showAsOptions(ProfileActivity.this, v, 0, 0);
+            });
             addView(btn);
         }
 
         private void addShareButton() {
-            View btn = createButton(R.drawable.ic_profile_share, R.string.Share,(view) -> {});
+            View btn = createButton(R.drawable.ic_profile_share, R.string.Share,(view) -> {
+                if (actionBar != null && actionBar.getActionBarMenuOnItemClick() != null) {
+                    actionBar.getActionBarMenuOnItemClick().onItemClick(share);
+                }
+            });
             addView(btn);
         }
 
         private void addStopButton() {
-            View btn = createButton(R.drawable.ic_profile_block, R.string.Stop,(view) -> {});
+            View btn = createButton(R.drawable.ic_profile_block, R.string.Stop,(view) -> {
+                if (actionBar != null && actionBar.getActionBarMenuOnItemClick() != null) {
+                    actionBar.getActionBarMenuOnItemClick().onItemClick(block_contact);
+                }
+            });
             addView(btn);
         }
 
         private void addRestartButton() {
-            View btn = createButton(R.drawable.msg_retry, R.string.Restart,(view) -> {});
+            View btn = createButton(R.drawable.msg_retry, R.string.Restart,(view) -> {
+                if (actionBar != null && actionBar.getActionBarMenuOnItemClick() != null) {
+                    actionBar.getActionBarMenuOnItemClick().onItemClick(block_contact);
+                }
+            });
             addView(btn);
         }
 
         private void addCallButton() {
-            View btn = createButton(R.drawable.ic_profile_call, R.string.Call,(view) -> {});
+            View btn = createButton(R.drawable.ic_profile_call, R.string.Call,(view) -> {
+                if (actionBar != null && actionBar.getActionBarMenuOnItemClick() != null) {
+                    actionBar.getActionBarMenuOnItemClick().onItemClick(call_item);
+                }
+            });
             addView(btn);
         }
 
         private void addVideoButton() {
-            View btn = createButton(R.drawable.ic_profile_video, R.string.Video,(view) -> {});
+            View btn = createButton(R.drawable.ic_profile_video, R.string.Video,(view) -> {
+                if (actionBar != null && actionBar.getActionBarMenuOnItemClick() != null) {
+                    actionBar.getActionBarMenuOnItemClick().onItemClick(video_call_item);
+                }
+            });
             addView(btn);
         }
 
         private void addJoinButton() {
-            View btn = createButton(R.drawable.ic_profile_join, R.string.Join,(view) -> {});
+            View btn = createButton(R.drawable.ic_profile_join, R.string.Join,(view) -> {
+                joinButtonPressed();
+            });
             addView(btn);
         }
 
         private void addReportButton() {
-            View btn = createButton(R.drawable.ic_profile_report, R.string.Report,(view) -> {});
+            View btn = createButton(R.drawable.ic_profile_report, R.string.Report,(view) -> {
+                if (actionBar != null && actionBar.getActionBarMenuOnItemClick() != null) {
+                    actionBar.getActionBarMenuOnItemClick().onItemClick(report);
+                }
+            });
             addView(btn);
         }
 
         private void addLeaveButton() {
-            View btn = createButton(R.drawable.ic_profile_leave, R.string.Leave,(view) -> {});
+            View btn = createButton(R.drawable.ic_profile_leave, R.string.Leave,(view) -> {
+                leaveChatPressed();
+            });
             addView(btn);
         }
 
         private void addDiscussButton() {
-            View btn = createButton(R.drawable.ic_profile_message, R.string.Discuss,(view) -> {});
+            View btn = createButton(R.drawable.ic_profile_message, R.string.Discuss,(view) -> {
+                openDiscussion();
+            });
             addView(btn);
         }
 
@@ -2460,12 +2523,20 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
 
         private void addLiveStreamButton() {
-            View btn = createButton(R.drawable.ic_profile_live_stream, R.string.LiveStream,(view) -> {});
+            View btn = createButton(R.drawable.ic_profile_live_stream, R.string.LiveStream,(view) -> {
+                if (actionBar != null && actionBar.getActionBarMenuOnItemClick() != null) {
+                    actionBar.getActionBarMenuOnItemClick().onItemClick(call_item);
+                }
+            });
             addView(btn);
         }
 
         private void addVoiceChatButton() {
-            View btn = createButton(R.drawable.ic_profile_live_stream, R.string.VoiceChat,(view) -> {});
+            View btn = createButton(R.drawable.ic_profile_live_stream, R.string.VoiceChat,(view) -> {
+                if (actionBar != null && actionBar.getActionBarMenuOnItemClick() != null) {
+                    actionBar.getActionBarMenuOnItemClick().onItemClick(call_item);
+                }
+            });
             addView(btn);
         }
 
@@ -2781,6 +2852,81 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
 
     }
+
+    ChatNotificationsPopupWrapper createChatNotificationsPopupWrapper(long did) {
+        ChatNotificationsPopupWrapper chatNotificationsPopupWrapper = new ChatNotificationsPopupWrapper(getContext(), currentAccount, null, true, true, new ChatNotificationsPopupWrapper.Callback() {
+            @Override
+            public void toggleSound() {
+                SharedPreferences preferences = MessagesController.getNotificationsSettings(currentAccount);
+                boolean enabled = !preferences.getBoolean("sound_enabled_" + NotificationsController.getSharedPrefKey(did, topicId), true);
+                preferences.edit().putBoolean("sound_enabled_" + NotificationsController.getSharedPrefKey(did, topicId), enabled).apply();
+                if (BulletinFactory.canShowBulletin(ProfileActivity.this)) {
+                    BulletinFactory.createSoundEnabledBulletin(ProfileActivity.this, enabled ? NotificationsController.SETTING_SOUND_ON : NotificationsController.SETTING_SOUND_OFF, getResourceProvider()).show();
+                }
+            }
+
+            @Override
+            public void muteFor(int timeInSeconds) {
+                if (timeInSeconds == 0) {
+                    if (getMessagesController().isDialogMuted(did, topicId)) {
+                        toggleMute();
+                    }
+                    if (BulletinFactory.canShowBulletin(ProfileActivity.this)) {
+                        BulletinFactory.createMuteBulletin(ProfileActivity.this, NotificationsController.SETTING_MUTE_UNMUTE, timeInSeconds, getResourceProvider()).show();
+                    }
+                } else {
+                    getNotificationsController().muteUntil(did, topicId, timeInSeconds);
+                    if (BulletinFactory.canShowBulletin(ProfileActivity.this)) {
+                        BulletinFactory.createMuteBulletin(ProfileActivity.this, NotificationsController.SETTING_MUTE_CUSTOM, timeInSeconds, getResourceProvider()).show();
+                    }
+                    updateExceptions();
+                    if (notificationsRow >= 0 && listAdapter != null) {
+                        listAdapter.notifyItemChanged(notificationsRow);
+                    }
+                    if (buttonContainer != null) {
+                        buttonContainer.updateButtons();
+                    }
+                }
+            }
+
+            @Override
+            public void showCustomize() {
+                if (did != 0) {
+                    Bundle args = new Bundle();
+                    args.putLong("dialog_id", did);
+                    args.putLong("topic_id", topicId);
+                    presentFragment(new ProfileNotificationsActivity(args, resourcesProvider));
+                }
+            }
+
+            @Override
+            public void toggleMute() {
+                boolean muted = getMessagesController().isDialogMuted(did, topicId);
+                getNotificationsController().muteDialog(did, topicId, !muted);
+                if (ProfileActivity.this.fragmentView != null) {
+                    BulletinFactory.createMuteBulletin(ProfileActivity.this, !muted, null).show();
+                }
+                updateExceptions();
+                if (notificationsRow >= 0 && listAdapter != null) {
+                    listAdapter.notifyItemChanged(notificationsRow);
+                }
+                if (buttonContainer != null) {
+                    buttonContainer.updateButtons();
+                }
+            }
+
+            @Override
+            public void openExceptions() {
+                Bundle bundle = new Bundle();
+                bundle.putLong("dialog_id", did);
+                TopicsNotifySettingsFragments notifySettings = new TopicsNotifySettingsFragments(bundle);
+                notifySettings.setExceptions(notificationsExceptionTopics);
+                presentFragment(notifySettings);
+            }
+        }, getResourceProvider());
+        return chatNotificationsPopupWrapper;
+    }
+
 
     @Override
     public View createView(Context context) {
@@ -4557,76 +4703,16 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     updateExceptions();
                     getNotificationsController().updateServerNotificationsSettings(did, topicId);
                     checkCell.setChecked(checked);
+                    if (buttonContainer != null) {
+                        buttonContainer.updateButtons();
+                    }
                     RecyclerListView.Holder holder = (RecyclerListView.Holder) listView.findViewHolderForPosition(notificationsRow);
                     if (holder != null) {
                         listAdapter.onBindViewHolder(holder, notificationsRow);
                     }
                     return;
                 }
-                ChatNotificationsPopupWrapper chatNotificationsPopupWrapper = new ChatNotificationsPopupWrapper(context, currentAccount, null, true, true, new ChatNotificationsPopupWrapper.Callback() {
-                    @Override
-                    public void toggleSound() {
-                        SharedPreferences preferences = MessagesController.getNotificationsSettings(currentAccount);
-                        boolean enabled = !preferences.getBoolean("sound_enabled_" + NotificationsController.getSharedPrefKey(did, topicId), true);
-                        preferences.edit().putBoolean("sound_enabled_" + NotificationsController.getSharedPrefKey(did, topicId), enabled).apply();
-                        if (BulletinFactory.canShowBulletin(ProfileActivity.this)) {
-                            BulletinFactory.createSoundEnabledBulletin(ProfileActivity.this, enabled ? NotificationsController.SETTING_SOUND_ON : NotificationsController.SETTING_SOUND_OFF, getResourceProvider()).show();
-                        }
-                    }
-
-                    @Override
-                    public void muteFor(int timeInSeconds) {
-                        if (timeInSeconds == 0) {
-                            if (getMessagesController().isDialogMuted(did, topicId)) {
-                                toggleMute();
-                            }
-                            if (BulletinFactory.canShowBulletin(ProfileActivity.this)) {
-                                BulletinFactory.createMuteBulletin(ProfileActivity.this, NotificationsController.SETTING_MUTE_UNMUTE, timeInSeconds, getResourceProvider()).show();
-                            }
-                        } else {
-                            getNotificationsController().muteUntil(did, topicId, timeInSeconds);
-                            if (BulletinFactory.canShowBulletin(ProfileActivity.this)) {
-                                BulletinFactory.createMuteBulletin(ProfileActivity.this, NotificationsController.SETTING_MUTE_CUSTOM, timeInSeconds, getResourceProvider()).show();
-                            }
-                            updateExceptions();
-                            if (notificationsRow >= 0 && listAdapter != null) {
-                                listAdapter.notifyItemChanged(notificationsRow);
-                            }
-                        }
-                    }
-
-                    @Override
-                    public void showCustomize() {
-                        if (did != 0) {
-                            Bundle args = new Bundle();
-                            args.putLong("dialog_id", did);
-                            args.putLong("topic_id", topicId);
-                            presentFragment(new ProfileNotificationsActivity(args, resourcesProvider));
-                        }
-                    }
-
-                    @Override
-                    public void toggleMute() {
-                        boolean muted = getMessagesController().isDialogMuted(did, topicId);
-                        getNotificationsController().muteDialog(did, topicId, !muted);
-                        if (ProfileActivity.this.fragmentView != null) {
-                            BulletinFactory.createMuteBulletin(ProfileActivity.this, !muted, null).show();
-                        }
-                        updateExceptions();
-                        if (notificationsRow >= 0 && listAdapter != null) {
-                            listAdapter.notifyItemChanged(notificationsRow);
-                        }
-                    }
-
-                    @Override
-                    public void openExceptions() {
-                        Bundle bundle = new Bundle();
-                        bundle.putLong("dialog_id", did);
-                        TopicsNotifySettingsFragments notifySettings = new TopicsNotifySettingsFragments(bundle);
-                        notifySettings.setExceptions(notificationsExceptionTopics);
-                        presentFragment(notifySettings);
-                    }
-                }, getResourceProvider());
+                ChatNotificationsPopupWrapper chatNotificationsPopupWrapper = createChatNotificationsPopupWrapper(did);
                 chatNotificationsPopupWrapper.update(did, topicId, notificationsExceptionTopics);
                 if (AndroidUtilities.isTablet()) {
                     View v = parentLayout.getView();
@@ -4668,28 +4754,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     presentFragment(fragment);
                 }
             } else if (position == joinRow) {
-                getMessagesController().addUserToChat(currentChat.id, getUserConfig().getCurrentUser(), 0, null, ProfileActivity.this, true, () -> {
-                    updateRowsIds();
-                    if (listAdapter != null) {
-                        listAdapter.notifyDataSetChanged();
-                    }
-                }, err -> {
-                    if (err != null && "INVITE_REQUEST_SENT".equals(err.text)) {
-                        SharedPreferences preferences = MessagesController.getNotificationsSettings(currentAccount);
-                        preferences.edit().putLong("dialog_join_requested_time_" + dialogId, System.currentTimeMillis()).commit();
-                        JoinGroupAlert.showBulletin(context, ProfileActivity.this, ChatObject.isChannel(currentChat) && !currentChat.megagroup);
-                        updateRowsIds();
-                        if (listAdapter != null) {
-                            listAdapter.notifyDataSetChanged();
-                        }
-                        if (lastFragment instanceof ChatActivity) {
-                            ((ChatActivity) lastFragment).showBottomOverlayProgress(false, true);
-                        }
-                        return false;
-                    }
-                    return true;
-                });
-                NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.closeSearchByActiveAction);
+                joinButtonPressed();
             } else if (position == subscribersRow) {
                 Bundle args = new Bundle();
                 args.putLong("chat_id", chatId);
@@ -6052,6 +6117,38 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }, false, resourcesProvider);
     }
 
+    private void joinButtonPressed() {
+        BaseFragment lastFragment = parentLayout.getLastFragment();
+        getMessagesController().addUserToChat(currentChat.id, getUserConfig().getCurrentUser(), 0, null, ProfileActivity.this, true, () -> {
+            updateRowsIds();
+            if (listAdapter != null) {
+                listAdapter.notifyDataSetChanged();
+            }
+            if (buttonContainer != null) {
+                buttonContainer.updateButtons();
+            }
+        }, err -> {
+            if (err != null && "INVITE_REQUEST_SENT".equals(err.text)) {
+                SharedPreferences preferences = MessagesController.getNotificationsSettings(currentAccount);
+                preferences.edit().putLong("dialog_join_requested_time_" + dialogId, System.currentTimeMillis()).commit();
+                JoinGroupAlert.showBulletin(getContext(), ProfileActivity.this, ChatObject.isChannel(currentChat) && !currentChat.megagroup);
+                updateRowsIds();
+                if (listAdapter != null) {
+                    listAdapter.notifyDataSetChanged();
+                }
+                if (buttonContainer != null) {
+                    buttonContainer.updateButtons();
+                }
+                if (lastFragment instanceof ChatActivity) {
+                    ((ChatActivity) lastFragment).showBottomOverlayProgress(false, true);
+                }
+                return false;
+            }
+            return true;
+        });
+        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.closeSearchByActiveAction);
+
+    }
     private void updateAvatarRoundRadius() {
         avatarImage.setRoundRadius((int) AndroidUtilities.lerp(getSmallAvatarRoundRadius(), 0f, currentExpandAnimatorValue));
     }
@@ -11078,6 +11175,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     }
 
     private void createActionBarMenu(boolean animated) {
+        if (buttonContainer != null) {
+            buttonContainer.updateButtons();
+        }
         if (actionBar == null || otherItem == null) {
             return;
         }
