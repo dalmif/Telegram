@@ -2283,37 +2283,219 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
 
         private void addButtons() {
-            String[] titles = new String[] {"Message", "Unmute", "Call", "Video"};
-            int[] icons = new int[] {R.drawable.ic_profile_message, R.drawable.ic_profile_unmute, R.drawable.ic_profile_call, R.drawable.ic_profile_video};
-            for (int i = 0; i < 4; i++) {
-                LinearLayout btn = new LinearLayout(getContext());
-                btn.setOrientation(LinearLayout.VERTICAL);
-                btn.setGravity(Gravity.CENTER);
-                RLottieImageView image = new RLottieImageView(getContext());
-                TextView text = new TextView(getContext());
-                text.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
-                text.setGravity(Gravity.CENTER);
-                text.setTextColor(Color.WHITE);
-                text.setTextSize(11);
-                text.setTypeface(AndroidUtilities.bold());
-                image.setImageResource(icons[i]);
-                LinearLayout.LayoutParams imageLP = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-                imageLP.setMargins(0, 0,0,dp(3));
-                image.setLayoutParams(imageLP);
-                text.setText(titles[i]);
-                btn.addView(image);
-                btn.addView(text);
-                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                        0,
-                        LayoutParams.MATCH_PARENT,
-                        1f
-                );
-                if (i > 0) {
-                    params.setMarginStart((int) spacing); // or params.leftMargin = spacing;
+            if (userId != 0) {
+                TLRPC.User user = getMessagesController().getUser(userId);
+                if (user == null) {
+                    return;
                 }
-                btn.setLayoutParams(params);
-                addView(btn);
+                if (UserObject.isUserSelf(user)) {
+                    // My Profile
+                }
+                else {
+                    if (isBot) {
+                        addMessageButton();
+                        addMuteButton();
+                        addShareButton();
+                        if (!userBlocked) {
+                            addStopButton();
+                        }
+                        else {
+                            addRestartButton();
+                        }
+                    }
+                    else {
+                        // Check if user is not in the user's contacts
+                        // getContactsController().contactsDict.get(userId) == null
+                        // Else:
+                        // THIS IS MY CONTACT
+                        // And this is phone number
+                        // !TextUtils.isEmpty(user.phone)
+
+                        addMessageButton();
+                        addMuteButton();
+                        boolean isVideoButtonAdded = false;
+                        if (userInfo != null && userInfo.phone_calls_available) {
+                            addCallButton();
+                            if (userInfo.video_calls_available) {
+                                addVideoButton();
+                                isVideoButtonAdded = true;
+                            }
+                        }
+                        if (!isVideoButtonAdded && !UserObject.isDeleted(user) && !isBot && currentEncryptedChat == null && !userBlocked && userId != 333000 && userId != 777000 && userId != 42777) {
+//                        if (!BuildVars.IS_BILLING_UNAVAILABLE && !user.self && !user.bot && !MessagesController.isSupportUser(user) && !getMessagesController().premiumPurchaseBlocked())
+                            addGiftButton();
+                        }
+                    }
+                }
             }
+            else if (chatId != 0) {
+                TLRPC.Chat chat = getMessagesController().getChat(chatId);
+                if (ChatObject.isChannel(chat) && !chat.megagroup) {
+                    // THIS IS A CHANNEL
+                    if (currentChat.creator) {
+                        addLiveStreamButton();
+                        addMuteButton();
+                        addAddStoryButton();
+                    }
+                    else {
+                        // Other Channel
+                        if (currentChat.left && !currentChat.kicked) {
+                            // Not a memeber
+                            long requestedTime = MessagesController.getNotificationsSettings(currentAccount).getLong("dialog_join_requested_time_" + dialogId, -1);
+                            if (!(requestedTime > 0 && System.currentTimeMillis() - requestedTime < 1000 * 60 * 2)) {
+                                addJoinButton();
+                            }
+                            if (ChatObject.isPublic(chat)) {
+                                addShareButton();
+                            }
+                            addReportButton();
+                        }
+                        else if (!currentChat.kicked) {
+                            // A member
+                            addMuteButton();
+                            if (chatInfo != null && chatInfo.linked_chat_id != 0) {
+                                addDiscussButton();
+                            }
+                            if (ChatObject.isPublic(chat)) {
+                                addShareButton();
+                            }
+                            if (!currentChat.creator) {
+                                addLeaveButton();
+                            }
+                        }
+                        else {
+                            // Not a Member and kicked
+                            if (ChatObject.isPublic(chat)) {
+                                addShareButton();
+                            }
+                            addReportButton();
+                        }
+                    }
+                }
+                else {
+                    addMessageButton();
+                    addMuteButton();
+                    if (chatInfo != null) {
+                        if (ChatObject.canManageCalls(chat) && chatInfo.call == null) {
+                            addVoiceChatButton();
+                        }
+                    }
+                    if (!chat.creator && !chat.left && !chat.kicked && !isTopic) {
+                        addLeaveButton();
+                    }
+                }
+            }
+
+           for (int i = 1; i < getChildCount(); i++) {
+               LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) getChildAt(i).getLayoutParams();
+               params.setMarginStart((int) spacing);
+           }
+        }
+
+        private void addMessageButton() {
+            View btn = createButton(R.drawable.ic_profile_message, R.string.Message,(view) -> {
+                onWriteButtonClick();
+            });
+            addView(btn);
+        }
+
+        private void addMuteButton() {
+            View btn = createButton(R.drawable.ic_profile_unmute, R.string.Unmute,(view) -> {});
+            addView(btn);
+        }
+
+        private void addShareButton() {
+            View btn = createButton(R.drawable.ic_profile_share, R.string.Share,(view) -> {});
+            addView(btn);
+        }
+
+        private void addStopButton() {
+            View btn = createButton(R.drawable.ic_profile_block, R.string.Stop,(view) -> {});
+            addView(btn);
+        }
+
+        private void addRestartButton() {
+            View btn = createButton(R.drawable.msg_retry, R.string.Restart,(view) -> {});
+            addView(btn);
+        }
+
+        private void addCallButton() {
+            View btn = createButton(R.drawable.ic_profile_call, R.string.Call,(view) -> {});
+            addView(btn);
+        }
+
+        private void addVideoButton() {
+            View btn = createButton(R.drawable.ic_profile_video, R.string.Video,(view) -> {});
+            addView(btn);
+        }
+
+        private void addJoinButton() {
+            View btn = createButton(R.drawable.ic_profile_join, R.string.Join,(view) -> {});
+            addView(btn);
+        }
+
+        private void addReportButton() {
+            View btn = createButton(R.drawable.ic_profile_report, R.string.Report,(view) -> {});
+            addView(btn);
+        }
+
+        private void addLeaveButton() {
+            View btn = createButton(R.drawable.ic_profile_leave, R.string.Leave,(view) -> {});
+            addView(btn);
+        }
+
+        private void addDiscussButton() {
+            View btn = createButton(R.drawable.ic_profile_message, R.string.Discuss,(view) -> {});
+            addView(btn);
+        }
+
+        private void addGiftButton() {
+            View btn = createButton(R.drawable.ic_profile_gift, R.string.Gift,(view) -> {});
+            addView(btn);
+        }
+
+        private void addAddStoryButton() {
+            View btn = createButton(R.drawable.ic_profile_story, R.string.AddStory,(view) -> {});
+            addView(btn);
+        }
+
+        private void addLiveStreamButton() {
+            View btn = createButton(R.drawable.ic_profile_live_stream, R.string.LiveStream,(view) -> {});
+            addView(btn);
+        }
+
+        private void addVoiceChatButton() {
+            View btn = createButton(R.drawable.ic_profile_live_stream, R.string.VoiceChat,(view) -> {});
+            addView(btn);
+        }
+
+        private View createButton(int iconRes, int textRes, OnClickListener clickListener) {
+            LinearLayout btn = new LinearLayout(getContext());
+            btn.setOrientation(LinearLayout.VERTICAL);
+            btn.setGravity(Gravity.CENTER);
+            RLottieImageView image = new RLottieImageView(getContext());
+            TextView text = new TextView(getContext());
+            text.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+            text.setGravity(Gravity.CENTER);
+            text.setTextColor(Color.WHITE);
+            text.setTextSize(11);
+            text.setTypeface(AndroidUtilities.bold());
+            image.setImageResource(iconRes);
+            LinearLayout.LayoutParams imageLP = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+            imageLP.setMargins(0, 0,0,dp(3));
+            image.setLayoutParams(imageLP);
+            text.setText(textRes);
+            btn.addView(image);
+            btn.addView(text);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    0,
+                    LayoutParams.MATCH_PARENT,
+                    1f
+            );
+            btn.setLayoutParams(params);
+            btn.setOnClickListener(clickListener);
+            btn.setBackground(Theme.createSimpleSelectorRoundRectDrawable((int) radius, Color.TRANSPARENT, ColorUtils.setAlphaComponent(Color.BLACK, 80)));
+            return btn;
         }
 
         public void calculatePaintForAvatar(int page){
@@ -2397,13 +2579,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             return paint;
         }
 
-        public void setButtonCount(int count) {
-            this.buttonCount = Math.max(1, count);
-            invalidate();
-        }
-
         @Override
         protected void onDraw(Canvas canvas) {
+            int buttonCount = getChildCount();
             if (buttonCount <= 0) return;
 
             int width = getWidth() - getPaddingLeft() - getPaddingRight();
@@ -10932,7 +11110,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     updateItemsUsername();
                 }
                 selfUser = true;
-            } else {
+            }
+            else {
                 if (user.bot && user.bot_can_edit) {
                     editItemVisible = true;
                 }
@@ -10977,7 +11156,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                             otherItem.addSubItem(block_contact, !userBlocked ? R.drawable.msg_block : R.drawable.msg_block, !userBlocked ? LocaleController.getString(R.string.BlockContact) : LocaleController.getString(R.string.Unblock));
                         }
                     }
-                } else {
+                }
+                else {
                     if (currentEncryptedChat == null) {
                         createAutoDeleteItem(context);
                     }
@@ -11000,7 +11180,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     otherItem.addSubItem(add_shortcut, R.drawable.msg_home, LocaleController.getString(R.string.AddShortcut));
                 }
             }
-        } else if (chatId != 0) {
+        }
+        else if (chatId != 0) {
             TLRPC.Chat chat = getMessagesController().getChat(chatId);
             hasVoiceChatItem = false;
 
@@ -11058,7 +11239,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         otherItem.addSubItem(leave_group, R.drawable.msg_leave, LocaleController.getString(R.string.LeaveChannelMenu));
                     }
                 }
-            } else {
+            }
+            else {
                 if (chatInfo != null) {
                     if (ChatObject.canManageCalls(chat) && chatInfo.call == null) {
                         otherItem.addSubItem(call_item, R.drawable.msg_voicechat, LocaleController.getString(R.string.StartVoipChat));

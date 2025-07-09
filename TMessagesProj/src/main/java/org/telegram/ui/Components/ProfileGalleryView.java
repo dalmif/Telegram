@@ -641,7 +641,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
     }
 
     public BackupImageView getCurrentItemView() {
-        if (adapter != null && !adapter.objects.isEmpty()) {
+        if (adapter != null && !adapter.objects.isEmpty() && adapter.objects.get(getCurrentItem()).avatarWithBlur != null) {
             return adapter.objects.get(getCurrentItem()).avatarWithBlur.avatarImageView;
         } else {
             return null;
