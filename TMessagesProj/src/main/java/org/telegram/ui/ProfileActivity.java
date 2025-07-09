@@ -2728,6 +2728,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         protected void onDraw(@NonNull Canvas canvas) {
             super.onDraw(canvas);
             if (!useRenderEffect) {
+                if (!isAvatarVisible) return;
                 RectF rectf = new RectF(0f, 0f, getWidth(), getHeight());
                 canvas.save();
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
