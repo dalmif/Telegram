@@ -2780,8 +2780,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 Canvas canvas1 = new Canvas(bitmap);
 
                 avatarImage.draw(canvas1);
-
-                Utilities.stackBlurBitmap(bitmap, (int) (dpf2(34) * blurFraction));
+                if (blurFraction > 0.0) {
+                    Utilities.stackBlurBitmap(bitmap, (int) (dpf2(34) * blurFraction));
+                }
                 Paint bitmapPaint = new Paint(paint);
                 bitmapPaint.setAlpha((int) (255f * blurredImageAlpha));
                 canvas.drawBitmap(createCircleBitmap(bitmap), null,
@@ -8287,7 +8288,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                                 avatarY + (avatarContainer.getHeight() / 2),
                                 (avatarWidth * avatarScale) / 2,
                                 diff,
-                                firstPart < secondPart ? 0f : -((2f * (1 - customDiff) - 2) * (2f * (1 - customDiff) - 2)) + 1
+                                firstPart < secondPart ? 0f : Math.max(0f, Math.min(1f, -((2f * (1 - customDiff) - 2) * (2f * (1 - customDiff) - 2)) + 1))
                         );
                         metaBallView.invalidate();
                     }

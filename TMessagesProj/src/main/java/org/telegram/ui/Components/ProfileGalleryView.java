@@ -1141,11 +1141,12 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
 
             int sliceStartY = Math.max(0, sourceHeight - ignoreBottomPx - sliceHeightPx);
             Bitmap slice = Bitmap.createBitmap(source, 0, sliceStartY, width, sliceHeightPx);
+            source.recycle();
 
             Matrix flipMatrix = new Matrix();
             flipMatrix.preScale(1f, -1f);
             Bitmap flippedSlice = Bitmap.createBitmap(slice, 0, 0, width, sliceHeightPx, flipMatrix, false);
-
+            slice.recycle();
             Bitmap result = Bitmap.createBitmap(width, totalHeightPx, Bitmap.Config.ARGB_8888);
             Canvas canvas = new Canvas(result);
 
@@ -1357,6 +1358,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
             if (item.isActiveVideo) {
                 return;
             }
+            ImageWithBlurAtBottom blurred = item.avatarWithBlur;
             BackupImageView imageView = item.avatarWithBlur.avatarImageView;
             if (imageView.getImageReceiver().hasStaticThumb()) {
                 Drawable drawable = imageView.getImageReceiver().getDrawable();
@@ -1365,7 +1367,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
                 }
             }
             imageView.setRoundRadius(0);
-            container.removeView(imageView);
+            container.removeView(blurred);
             imageView.getImageReceiver().cancelLoadImage();
         }
 
