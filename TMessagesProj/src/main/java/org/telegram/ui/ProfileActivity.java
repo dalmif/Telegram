@@ -8282,7 +8282,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 if (metaBallView != null) {
                     if (expandAnimator == null || !expandAnimator.isRunning()) {
                         metaBallView.setAvatarVisibility(true);
-                        int avatarWidth = Math.min(dp(89) - dp(4), avatarContainer.getWidth());
+                        int avatarWidth = Math.min(dp(89), avatarContainer.getWidth());
                         metaBallView.setGooey(
                                 avatarY + (avatarContainer.getHeight() / 2),
                                 (avatarWidth * avatarScale) / 2,
