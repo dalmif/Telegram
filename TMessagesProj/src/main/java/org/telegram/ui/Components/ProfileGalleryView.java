@@ -1285,7 +1285,6 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
             });
             boolean needProgress = false;
             if (imageLocationPosition == 0) {
-                Log.i("hadi","first: " + parentAvatarImageView.getImageReceiver());
                 Drawable drawable = parentAvatarImageView == null ? null : parentAvatarImageView.getImageReceiver().getDrawable();
                 if (drawable instanceof AnimatedFileDrawable && ((AnimatedFileDrawable) drawable).hasBitmap()) {
                     AnimatedFileDrawable animatedFileDrawable = (AnimatedFileDrawable) drawable;

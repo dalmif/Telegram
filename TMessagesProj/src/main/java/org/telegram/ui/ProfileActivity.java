@@ -2794,7 +2794,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             else {
                 canvas.drawRect(0,-dp(98), getWidth(), dp(4), paint);
                 if (isAvatarVisible) {
-                    canvas.drawCircle(getWidth() / 2f, gooeyYCenter, radius, paint);
+                    canvas.drawCircle(getWidth() / 2f, gooeyYCenter, radius - (!storyView.isEmpty() ? dp(3) : 0), paint);
                     Bitmap bitmap = Bitmap.createBitmap(dp(89), dp(89), Bitmap.Config.ARGB_8888);
                     Canvas canvas1 = new Canvas(bitmap);
                     avatarImage.draw(canvas1);

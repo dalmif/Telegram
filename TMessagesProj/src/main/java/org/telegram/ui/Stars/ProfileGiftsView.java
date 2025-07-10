@@ -104,8 +104,6 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
     }
 
     public void setExpandCoords(float right, boolean rightPadded, float y) {
-        Log.i("mmd","here is setExpandCoords: " + right +" y:" + y);
-
         this.expandRight = right;
         this.expandRightPad = rightPadded;
         this.expandY = y;
